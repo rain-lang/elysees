@@ -9,3 +9,5 @@ Fork of `triomphe::Arc`. This has the following advantages over std::sync::Arc:
  * `elysees::Arc` has can be constructed for dynamically-sized types via `from_header_and_iter`
  * `elysees::ThinArc` provides thin-pointer `Arc`s to dynamically sized types
  * `elysees::ArcUnion` is union of two `elysees:Arc`s which fits inside one word of memory
+
+ This currently just adds a getter to the refcount, but some other additional features are planned, including 3 and 4-variant `ArcUnion`s, and `ArcUnion`s with `ThinArc`s.
