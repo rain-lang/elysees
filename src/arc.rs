@@ -11,7 +11,7 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::ptr;
 use core::sync::atomic;
-use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use core::sync::atomic::Ordering::{self as LoadOrdering, Acquire, Relaxed, Release};
 use core::{isize, usize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -282,6 +282,11 @@ impl<T: ?Sized> Arc<T> {
         //
         // [1] https://github.com/servo/servo/issues/21186
         self.inner().count.load(Acquire) == 1
+    }
+
+    /// Get the reference count of this `Arc` with a given memory ordering
+    pub fn get_refcount(&self, ordering: LoadOrdering) -> usize {
+        self.inner().count.load(ordering)
     }
 }
 
