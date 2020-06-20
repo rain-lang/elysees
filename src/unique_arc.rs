@@ -30,6 +30,7 @@ use super::{Arc, ArcInner};
 /// x[4] = 7; // mutate!
 /// let y = x.shareable(); // y is an Arc<T>
 /// ```
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
 pub struct UniqueArc<T: ?Sized>(Arc<T>);
 

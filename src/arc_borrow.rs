@@ -1,3 +1,4 @@
+use core::hash::Hash;
 use core::mem;
 use core::mem::ManuallyDrop;
 use core::ops::Deref;
@@ -19,7 +20,7 @@ use super::Arc;
 ///
 /// `ArcBorrow` lets us deal with borrows of known-refcounted objects
 /// without needing to worry about where the `Arc<T>` is.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 #[repr(transparent)]
 pub struct ArcBorrow<'a, T: 'a>(pub(crate) &'a T);
 

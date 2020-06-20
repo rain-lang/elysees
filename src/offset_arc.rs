@@ -1,4 +1,5 @@
 use core::fmt;
+use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ops::Deref;
@@ -72,6 +73,12 @@ impl<T: PartialEq> PartialEq for OffsetArc<T> {
 
     fn ne(&self, other: &OffsetArc<T>) -> bool {
         *(*self) != *(*other)
+    }
+}
+
+impl<T: Hash> Hash for OffsetArc<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
     }
 }
 

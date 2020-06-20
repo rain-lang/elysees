@@ -11,12 +11,11 @@ use super::{Arc, ArcInner};
 
 /// Structure to allow Arc-managing some fixed-sized data and a variably-sized
 /// slice in a single allocation.
-#[derive(Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[repr(C)]
 pub struct HeaderSlice<H, T: ?Sized> {
     /// The fixed-sized data.
     pub header: H,
-
     /// The dynamically-sized data.
     pub slice: T,
 }
@@ -118,7 +117,7 @@ impl<H, T> Arc<HeaderSlice<H, [T]>> {
 
 /// Header data with an inline length. Consumers that use HeaderWithLength as the
 /// Header type in HeaderSlice can take advantage of ThinArc.
-#[derive(Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Hash)]
 #[repr(C)]
 pub struct HeaderWithLength<H> {
     /// The fixed-sized data.

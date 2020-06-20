@@ -1,4 +1,5 @@
 use core::fmt;
+use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::ptr;
 use core::usize;
@@ -25,17 +26,18 @@ unsafe impl<A: Sync + Send, B: Send + Sync> Sync for ArcUnion<A, B> {}
 
 impl<A: PartialEq, B: PartialEq> PartialEq for ArcUnion<A, B> {
     fn eq(&self, other: &Self) -> bool {
-        use crate::ArcUnionBorrow::*;
-        match (self.borrow(), other.borrow()) {
-            (First(x), First(y)) => x == y,
-            (Second(x), Second(y)) => x == y,
-            (_, _) => false,
-        }
+        self.borrow() == other.borrow()
+    }
+}
+
+impl<A: Hash, B: Hash> Hash for ArcUnion<A, B> {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.borrow().hash(hasher)
     }
 }
 
 /// This represents a borrow of an `ArcUnion`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ArcUnionBorrow<'a, A: 'a, B: 'a> {
     First(ArcBorrow<'a, A>),
     Second(ArcBorrow<'a, B>),
