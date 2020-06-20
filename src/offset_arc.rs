@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::ptr;
+use core::sync::atomic::Ordering;
 
 use super::{Arc, ArcBorrow};
 
@@ -135,5 +136,10 @@ impl<T> OffsetArc<T> {
     #[inline]
     pub fn borrow_arc<'a>(&'a self) -> ArcBorrow<'a, T> {
         ArcBorrow(&**self)
+    }
+
+    /// Get the reference count of this `Arc` with a given memory ordering
+    pub fn get_count(&self, ordering: Ordering) -> usize {
+        self.with_arc(|a| a.get_count(ordering))
     }
 }

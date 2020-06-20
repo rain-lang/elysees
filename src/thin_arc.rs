@@ -7,6 +7,7 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::ptr;
 use core::slice;
+use core::sync::atomic::Ordering;
 use core::usize;
 
 use super::{Arc, ArcInner, HeaderSliceWithLength, HeaderWithLength};
@@ -92,6 +93,10 @@ impl<H, T> ThinArc<H, T> {
     #[inline]
     pub fn heap_ptr(&self) -> *const c_void {
         self.ptr()
+    }
+    /// Get the reference count of this `Arc` with a given memory ordering
+    pub fn get_count(&self, ordering: Ordering) -> usize {
+        self.with_arc(|a| a.get_count(ordering))
     }
 }
 

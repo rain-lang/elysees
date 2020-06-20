@@ -2,6 +2,7 @@ use core::hash::Hash;
 use core::mem;
 use core::mem::ManuallyDrop;
 use core::ops::Deref;
+use core::sync::atomic::Ordering;
 
 use super::Arc;
 
@@ -79,6 +80,13 @@ impl<'a, T> ArcBorrow<'a, T> {
     #[inline]
     pub fn get(&self) -> &'a T {
         self.0
+    }
+    /// Get the reference count of this `Arc` with a given memory ordering
+    pub fn get_count(&self, ordering: Ordering) -> usize
+    where
+        T: 'static,
+    {
+        self.with_arc(|a| a.get_count(ordering))
     }
 }
 

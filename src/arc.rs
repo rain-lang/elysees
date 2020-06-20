@@ -285,7 +285,7 @@ impl<T: ?Sized> Arc<T> {
     }
 
     /// Get the reference count of this `Arc` with a given memory ordering
-    pub fn get_refcount(&self, ordering: LoadOrdering) -> usize {
+    pub fn get_count(&self, ordering: LoadOrdering) -> usize {
         self.inner().count.load(ordering)
     }
 }
