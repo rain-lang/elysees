@@ -8,6 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! [![crates.io](https://img.shields.io/crates/v/elysees)](https://crates.io/crates/elysees)
 //! Fork of Arc. This has the following advantages over std::sync::Arc:
 //!
 //! * `elysees::Arc` doesn't support weak references: we save space by excluding the weak reference count, and we don't do extra read-modify-update operations to handle the possibility of weak references.
@@ -17,6 +18,8 @@
 //! * `elysees::Arc` has can be constructed for dynamically-sized types via `from_header_and_iter`
 //! * `elysees::ThinArc` provides thin-pointer `Arc`s to dynamically sized types
 //! * `elysees::ArcUnion` is union of two `elysees:Arc`s which fits inside one word of memory
+//! 
+//!  This currently just adds a getter to the refcount, but some other additional features are planned, including 3 and 4-variant `ArcUnion`s, and `ArcUnion`s with `ThinArc`s.
 
 #![allow(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
