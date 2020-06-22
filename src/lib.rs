@@ -9,6 +9,7 @@
 // except according to those terms.
 
 //! [![crates.io](https://img.shields.io/crates/v/elysees)](https://crates.io/crates/elysees)
+//! [![Downloads](https://img.shields.io/crates/d/elysees)](https://crates.io/crates/elysees)
 //! Fork of Arc. This has the following advantages over std::sync::Arc:
 //!
 //! * `elysees::Arc` doesn't support weak references: we save space by excluding the weak reference count, and we don't do extra read-modify-update operations to handle the possibility of weak references.
