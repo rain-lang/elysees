@@ -19,28 +19,18 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate core;
 
-#[macro_use]
-extern crate memoffset;
 #[cfg(feature = "serde")]
 extern crate serde;
 #[cfg(feature = "stable_deref_trait")]
 extern crate stable_deref_trait;
 
 mod arc;
-mod arc_borrow;
-mod arc_handle;
-mod arc_union;
-mod header;
-mod thin_arc;
-mod unique_arc;
+mod borrow;
+mod unique;
 
 pub use arc::*;
-pub use arc_borrow::*;
-pub use arc_handle::*;
-pub use arc_union::*;
-pub use header::*;
-pub use thin_arc::*;
-pub use unique_arc::*;
+pub use borrow::*;
+pub use unique::*;
 
 #[cfg(feature = "std")]
 use std::process::abort;

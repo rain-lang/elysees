@@ -1,14 +1,14 @@
 use core::borrow::Borrow;
 use core::convert::AsRef;
 use core::hash::Hash;
-use core::mem;
-use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
-use super::{Arc, ArcHandle};
+use super::Arc;
 
 /// A "borrowed `Arc`". This is a pointer to
 /// a T that is known to have been allocated within an
@@ -25,32 +25,23 @@ use super::{Arc, ArcHandle};
 ///
 /// `ArcBorrow` lets us deal with borrows of known-refcounted objects
 /// without needing to worry about where the `Arc<T>` is.
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct ArcBorrow<'a, T: 'a>(pub(crate) &'a T);
+pub struct ArcBorrow<'a, T: ?Sized + 'a>(pub(crate) &'a T);
 
-impl<'a, T> Copy for ArcBorrow<'a, T> {}
-impl<'a, T> Clone for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> Copy for ArcBorrow<'a, T> {}
+impl<'a, T: ?Sized> Clone for ArcBorrow<'a, T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T> ArcBorrow<'a, T> {
-    /// Clone this as an `ArcHandle<T>`. This bumps the refcount.
-    #[inline]
-    pub fn clone_handle(&self) -> ArcHandle<T> {
-        let arc = unsafe { ArcHandle::from_raw(self.0) };
-        // addref it!
-        mem::forget(arc.clone());
-        arc
-    }
-
+impl<'a, T: ?Sized> ArcBorrow<'a, T> {
     /// Clone this as an `Arc<T>`. This bumps the refcount.
     #[inline]
     pub fn clone_arc(&self) -> Arc<T> {
-        ArcHandle::into_arc(self.clone_handle())
+        self.as_arc().clone()
     }
 
     /// Borrow this as an `Arc<T>`. This does *not* bump the refcount.
@@ -73,24 +64,6 @@ impl<'a, T> ArcBorrow<'a, T> {
         this.0 as *const T == other.0 as *const T
     }
 
-    /// Temporarily converts `|self|` into a bonafide `ArcHandle` and exposes it to the
-    /// provided callback. The refcount is not modified.
-    #[inline]
-    pub fn with_handle<F, U>(&self, f: F) -> U
-    where
-        F: FnOnce(&ArcHandle<T>) -> U,
-        T: 'static,
-    {
-        // Synthesize transient Arc, which never touches the refcount.
-        let transient = unsafe { ManuallyDrop::new(ArcHandle::from_raw(self.0)) };
-
-        // Expose the transient Arc to the callback, which may clone it if it wants.
-        let result = f(&transient);
-
-        // Forward the result.
-        result
-    }
-
     /// Similar to deref, but uses the lifetime |a| rather than the lifetime of
     /// self, which is incompatible with the signature of the Deref trait.
     #[inline]
@@ -99,15 +72,12 @@ impl<'a, T> ArcBorrow<'a, T> {
     }
 
     /// Get the reference count of this `Arc` with a given memory ordering
-    pub fn get_count(&self, ordering: Ordering) -> usize
-    where
-        T: 'static,
-    {
-        self.with_handle(|a| a.get_count(ordering))
+    pub fn count(this: ArcBorrow<'a, T>, ordering: Ordering) -> usize {
+        Arc::count(this.as_arc(), ordering)
     }
 }
 
-impl<'a, T> Deref for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> Deref for ArcBorrow<'a, T> {
     type Target = T;
 
     #[inline]
@@ -116,48 +86,53 @@ impl<'a, T> Deref for ArcBorrow<'a, T> {
     }
 }
 
-impl<'a, T> Borrow<Arc<T>> for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> Borrow<Arc<T>> for ArcBorrow<'a, T> {
     fn borrow(&self) -> &Arc<T> {
         self.as_arc()
     }
 }
 
-impl<'a, T> Borrow<&'a T> for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> Borrow<&'a T> for ArcBorrow<'a, T> {
     fn borrow(&self) -> &&'a T {
-        unsafe {
-            std::mem::transmute(self)  
-        }
+        unsafe { std::mem::transmute(self) }
     }
 }
 
-impl<'a, T> Borrow<T> for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> Borrow<T> for ArcBorrow<'a, T> {
     fn borrow(&self) -> &T {
         self.deref()
     }
 }
 
-impl<'a, T> AsRef<Arc<T>> for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> AsRef<Arc<T>> for ArcBorrow<'a, T> {
     fn as_ref(&self) -> &Arc<T> {
         self.as_arc()
     }
 }
 
-impl<'a, T> AsRef<&'a T> for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> AsRef<&'a T> for ArcBorrow<'a, T> {
     fn as_ref(&self) -> &&'a T {
-        unsafe {
-            std::mem::transmute(self)  
-        }
+        unsafe { std::mem::transmute(self) }
     }
 }
 
-impl<'a, T> AsRef<T> for ArcBorrow<'a, T> {
+impl<'a, T: ?Sized> AsRef<T> for ArcBorrow<'a, T> {
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<'a, T: ?Sized> StableDeref for ArcBorrow<'a, T> {}
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<'a, T: ?Sized> CloneStableDeref for ArcBorrow<'a, T> {}
 
-#[cfg(feature = "stable_deref_trait")]
-unsafe impl<'a, T> StableDeref for ArcBorrow<'a, T> {}
-#[cfg(feature = "stable_deref_trait")]
-unsafe impl<'a, T> CloneStableDeref for ArcBorrow<'a, T> {}
+#[cfg(feature = "serde")]
+impl<'a, T: ?Sized + Serialize> Serialize for ArcBorrow<'a, T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::ser::Serializer,
+    {
+        (**self).serialize(serializer)
+    }
+}
