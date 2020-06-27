@@ -1,23 +1,27 @@
+use core::borrow::Borrow;
+use core::convert::AsRef;
 use core::hash::Hash;
 use core::mem;
 use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "stable_deref_trait")]
+use stable_deref_trait::{CloneStableDeref, StableDeref};
 
-use super::Arc;
+use super::{Arc, ArcHandle};
 
 /// A "borrowed `Arc`". This is a pointer to
 /// a T that is known to have been allocated within an
 /// `Arc`.
 ///
-/// This is equivalent in guarantees to `&Arc<T>`, however it is
-/// a bit more flexible. To obtain an `&Arc<T>` you must have
-/// an `Arc<T>` instance somewhere pinned down until we're done with it.
+/// This is equivalent in guarantees to `&ArcHandle<T>`, however it is
+/// a bit more flexible. To obtain an `&ArcHandle<T>` you must have
+/// an `ArcHandle<T>` instance somewhere pinned down until we're done with it.
 /// It's also a direct pointer to `T`, so using this involves less pointer-chasing
 ///
 /// However, C++ code may hand us refcounted things as pointers to T directly,
 /// so we have to conjure up a temporary `Arc` on the stack each time. The
-/// same happens for when the object is managed by a `OffsetArc`.
+/// same happens for when the object is managed by a `Arc`.
 ///
 /// `ArcBorrow` lets us deal with borrows of known-refcounted objects
 /// without needing to worry about where the `Arc<T>` is.
@@ -34,13 +38,25 @@ impl<'a, T> Clone for ArcBorrow<'a, T> {
 }
 
 impl<'a, T> ArcBorrow<'a, T> {
-    /// Clone this as an `Arc<T>`. This bumps the refcount.
+    /// Clone this as an `ArcHandle<T>`. This bumps the refcount.
     #[inline]
-    pub fn clone_arc(&self) -> Arc<T> {
-        let arc = unsafe { Arc::from_raw(self.0) };
+    pub fn clone_handle(&self) -> ArcHandle<T> {
+        let arc = unsafe { ArcHandle::from_raw(self.0) };
         // addref it!
         mem::forget(arc.clone());
         arc
+    }
+
+    /// Clone this as an `Arc<T>`. This bumps the refcount.
+    #[inline]
+    pub fn clone_arc(&self) -> Arc<T> {
+        ArcHandle::into_arc(self.clone_handle())
+    }
+
+    /// Borrow this as an `Arc<T>`. This does *not* bump the refcount.
+    #[inline]
+    pub fn as_arc(&self) -> &Arc<T> {
+        unsafe { std::mem::transmute(self) }
     }
 
     /// For constructing from a reference known to be Arc-backed,
@@ -57,16 +73,16 @@ impl<'a, T> ArcBorrow<'a, T> {
         this.0 as *const T == other.0 as *const T
     }
 
-    /// Temporarily converts |self| into a bonafide Arc and exposes it to the
+    /// Temporarily converts `|self|` into a bonafide `ArcHandle` and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline]
-    pub fn with_arc<F, U>(&self, f: F) -> U
+    pub fn with_handle<F, U>(&self, f: F) -> U
     where
-        F: FnOnce(&Arc<T>) -> U,
+        F: FnOnce(&ArcHandle<T>) -> U,
         T: 'static,
     {
         // Synthesize transient Arc, which never touches the refcount.
-        let transient = unsafe { ManuallyDrop::new(Arc::from_raw(self.0)) };
+        let transient = unsafe { ManuallyDrop::new(ArcHandle::from_raw(self.0)) };
 
         // Expose the transient Arc to the callback, which may clone it if it wants.
         let result = f(&transient);
@@ -81,12 +97,13 @@ impl<'a, T> ArcBorrow<'a, T> {
     pub fn get(&self) -> &'a T {
         self.0
     }
+
     /// Get the reference count of this `Arc` with a given memory ordering
     pub fn get_count(&self, ordering: Ordering) -> usize
     where
         T: 'static,
     {
-        self.with_arc(|a| a.get_count(ordering))
+        self.with_handle(|a| a.get_count(ordering))
     }
 }
 
@@ -98,3 +115,49 @@ impl<'a, T> Deref for ArcBorrow<'a, T> {
         self.0
     }
 }
+
+impl<'a, T> Borrow<Arc<T>> for ArcBorrow<'a, T> {
+    fn borrow(&self) -> &Arc<T> {
+        self.as_arc()
+    }
+}
+
+impl<'a, T> Borrow<&'a T> for ArcBorrow<'a, T> {
+    fn borrow(&self) -> &&'a T {
+        unsafe {
+            std::mem::transmute(self)  
+        }
+    }
+}
+
+impl<'a, T> Borrow<T> for ArcBorrow<'a, T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<'a, T> AsRef<Arc<T>> for ArcBorrow<'a, T> {
+    fn as_ref(&self) -> &Arc<T> {
+        self.as_arc()
+    }
+}
+
+impl<'a, T> AsRef<&'a T> for ArcBorrow<'a, T> {
+    fn as_ref(&self) -> &&'a T {
+        unsafe {
+            std::mem::transmute(self)  
+        }
+    }
+}
+
+impl<'a, T> AsRef<T> for ArcBorrow<'a, T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+
+
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<'a, T> StableDeref for ArcBorrow<'a, T> {}
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<'a, T> CloneStableDeref for ArcBorrow<'a, T> {}

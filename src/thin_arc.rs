@@ -10,7 +10,7 @@ use core::slice;
 use core::sync::atomic::Ordering;
 use core::usize;
 
-use super::{Arc, ArcInner, HeaderSliceWithLength, HeaderWithLength};
+use super::{ArcHandle, ArcInner, HeaderSliceWithLength, HeaderWithLength};
 
 /// A "thin" `Arc` containing dynamically sized data
 ///
@@ -54,11 +54,11 @@ impl<H, T> ThinArc<H, T> {
     #[inline]
     pub fn with_arc<F, U>(&self, f: F) -> U
     where
-        F: FnOnce(&Arc<HeaderSliceWithLength<H, [T]>>) -> U,
+        F: FnOnce(&ArcHandle<HeaderSliceWithLength<H, [T]>>) -> U,
     {
         // Synthesize transient Arc, which never touches the refcount of the ArcInner.
         let transient = unsafe {
-            ManuallyDrop::new(Arc {
+            ManuallyDrop::new(ArcHandle {
                 p: ptr::NonNull::new_unchecked(thin_to_thick(self.ptr.as_ptr())),
                 phantom: PhantomData,
             })
@@ -78,7 +78,7 @@ impl<H, T> ThinArc<H, T> {
         I: Iterator<Item = T> + ExactSizeIterator,
     {
         let header = HeaderWithLength::new(header, items.len());
-        Arc::into_thin(Arc::from_header_and_iter(header, items))
+        ArcHandle::into_thin(ArcHandle::from_header_and_iter(header, items))
     }
 
     /// Returns the address on the heap of the ThinArc itself -- not the T
@@ -112,22 +112,22 @@ impl<H, T> Deref for ThinArc<H, T> {
 impl<H, T> Clone for ThinArc<H, T> {
     #[inline]
     fn clone(&self) -> Self {
-        ThinArc::with_arc(self, |a| Arc::into_thin(a.clone()))
+        ThinArc::with_arc(self, |a| ArcHandle::into_thin(a.clone()))
     }
 }
 
 impl<H, T> Drop for ThinArc<H, T> {
     #[inline]
     fn drop(&mut self) {
-        let _ = Arc::from_thin(ThinArc {
+        let _ = ArcHandle::from_thin(ThinArc {
             ptr: self.ptr,
             phantom: PhantomData,
         });
     }
 }
 
-impl<H, T> Arc<HeaderSliceWithLength<H, [T]>> {
-    /// Converts an `Arc` into a `ThinArc`. This consumes the `Arc`, so the refcount
+impl<H, T> ArcHandle<HeaderSliceWithLength<H, [T]>> {
+    /// Converts an `ArcHandle` into a `ThinArc`. This consumes the `ArcHandle`, so the refcount
     /// is not modified.
     #[inline]
     pub fn into_thin(a: Self) -> ThinArc<H, T> {
@@ -149,14 +149,14 @@ impl<H, T> Arc<HeaderSliceWithLength<H, [T]>> {
         }
     }
 
-    /// Converts a `ThinArc` into an `Arc`. This consumes the `ThinArc`, so the refcount
+    /// Converts a `ThinArc` into an `ArcHandle`. This consumes the `ThinArc`, so the refcount
     /// is not modified.
     #[inline]
     pub fn from_thin(a: ThinArc<H, T>) -> Self {
         let ptr = thin_to_thick(a.ptr.as_ptr());
         mem::forget(a);
         unsafe {
-            Arc {
+            ArcHandle {
                 p: ptr::NonNull::new_unchecked(ptr),
                 phantom: PhantomData,
             }
@@ -182,7 +182,7 @@ impl<H: Hash, T: Hash> Hash for ThinArc<H, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Arc, HeaderWithLength, ThinArc};
+    use crate::{ArcHandle, HeaderWithLength, ThinArc};
     use alloc::vec;
     use core::clone::Clone;
     use core::ops::Drop;
@@ -203,8 +203,8 @@ mod tests {
     #[test]
     fn empty_thin() {
         let header = HeaderWithLength::new(100u32, 0);
-        let x = Arc::from_header_and_iter(header, core::iter::empty::<i32>());
-        let y = Arc::into_thin(x.clone());
+        let x = ArcHandle::from_header_and_iter(header, core::iter::empty::<i32>());
+        let y = ArcHandle::into_thin(x.clone());
         assert_eq!(y.header.header, 100);
         assert!(y.slice.is_empty());
         assert_eq!(x.header.header, 100);
@@ -235,11 +235,11 @@ mod tests {
         let v = vec![5, 6];
         let header = HeaderWithLength::new(c, v.len());
         {
-            let x = Arc::into_thin(Arc::from_header_and_iter(header, v.into_iter()));
+            let x = ArcHandle::into_thin(ArcHandle::from_header_and_iter(header, v.into_iter()));
             let y = ThinArc::with_arc(&x, |q| q.clone());
             let _ = y.clone();
             let _ = x == x;
-            Arc::from_thin(x.clone());
+            ArcHandle::from_thin(x.clone());
         }
         assert_eq!(canary.load(Acquire), 1);
     }
