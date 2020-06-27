@@ -26,9 +26,11 @@ extern crate stable_deref_trait;
 
 mod arc;
 mod borrow;
+mod unique;
 
 pub use arc::*;
 pub use borrow::*;
+pub use unique::*;
 
 #[cfg(feature = "std")]
 use std::process::abort;

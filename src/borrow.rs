@@ -3,6 +3,8 @@ use core::convert::AsRef;
 use core::hash::Hash;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
@@ -124,3 +126,13 @@ impl<'a, T: ?Sized> AsRef<T> for ArcBorrow<'a, T> {
 unsafe impl<'a, T: ?Sized> StableDeref for ArcBorrow<'a, T> {}
 #[cfg(feature = "stable_deref_trait")]
 unsafe impl<'a, T: ?Sized> CloneStableDeref for ArcBorrow<'a, T> {}
+
+#[cfg(feature = "serde")]
+impl<'a, T: ?Sized + Serialize> Serialize for ArcBorrow<'a, T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::ser::Serializer,
+    {
+        (**self).serialize(serializer)
+    }
+}
