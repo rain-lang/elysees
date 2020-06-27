@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
-
 /// A soft limit on the amount of references that may be made to an `Arc`.
 ///
 /// Going above this limit will abort your program (although not
@@ -152,6 +151,14 @@ impl<T: ?Sized> Arc<T> {
     fn borrow_refcount(&self) -> &atomic::AtomicUsize {
         unsafe { ArcInner::refcount_ptr(self.ptr.as_ptr()) }
     }
+    /// Whether or not the `Arc` is uniquely owned (is the refcount 1?).
+    #[inline]
+    pub fn is_unique(&self) -> bool {
+        // See the extensive discussion in [1] for why this needs to be Acquire.
+        //
+        // [1] https://github.com/servo/servo/issues/21186
+        Arc::count(self, Acquire) == 1
+    }
     /// Get the reference count of this `Arc` with a given ordering
     #[inline]
     pub fn count(this: &Arc<T>, ordering: LoadOrdering) -> usize {
@@ -237,8 +244,38 @@ impl<T: ?Sized> Deref for Arc<T> {
 
     #[inline]
     fn deref(&self) -> &T {
+        unsafe { &*self.ptr.as_ptr() }
+    }
+}
+
+impl<T: Clone> Arc<T> {
+    /// Makes a mutable reference to the `ArcHandle`, cloning if necessary
+    ///
+    /// This is functionally equivalent to [`Arc::make_mut`][mm] from the standard library.
+    ///
+    /// If this `ArcHandle` is uniquely owned, `make_mut()` will provide a mutable
+    /// reference to the contents. If not, `make_mut()` will create a _new_ `ArcHandle`
+    /// with a copy of the contents, update `this` to point to it, and provide
+    /// a mutable reference to its contents.
+    ///
+    /// This is useful for implementing copy-on-write schemes where you wish to
+    /// avoid copying things if your `Arc` is not shared.
+    ///
+    /// [mm]: https://doc.rust-lang.org/stable/std/sync/struct.Arc.html#method.make_mut
+    #[inline]
+    pub fn make_mut(this: &mut Self) -> &mut T {
+        if !this.is_unique() {
+            // Another pointer exists; clone
+            *this = Arc::new((**this).clone());
+        }
+
         unsafe {
-            &*self.ptr.as_ptr()
+            // This unsafety is ok because we're guaranteed that the pointer
+            // returned is the *only* pointer that will ever be returned to T. Our
+            // reference count is guaranteed to be 1 at this point, and we required
+            // the Arc itself to be `mut`, so we're returning the only possible
+            // reference to the inner data.
+            &mut *this.ptr.as_ptr()
         }
     }
 }
@@ -334,7 +371,6 @@ impl<T: ?Sized> AsRef<T> for Arc<T> {
         &**self
     }
 }
-
 
 #[cfg(feature = "stable_deref_trait")]
 unsafe impl<T: ?Sized> StableDeref for Arc<T> {}
