@@ -123,6 +123,18 @@ impl<T: ?Sized> Arc<T> {
             ArcBorrow::from_ref(self.deref())
         }
     }
+    /// Leak this `Arc<T>`, getting an `ArcBorrow<'static, T>`
+    /// 
+    /// You can call the `get` method on the returned `ArcBorrow` to get an `&'static T`. 
+    /// Note that using this can (obviously) cause memory leaks!
+    #[inline]
+    pub fn leak(this: Arc<T>) -> ArcBorrow<'static, T> {
+        let result = unsafe {
+            ArcBorrow::from_ref(&*this.ptr.as_ptr())
+        };
+        mem::forget(this);
+        result
+    }
     /// Convert the `Arc<T>` to a raw pointer, suitable for use across FFI
     ///
     /// Note: This returns a pointer to the data T, which is offset in the allocation.
