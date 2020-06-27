@@ -165,6 +165,14 @@ impl<T> Arc<T> {
         ArcBorrow(&**self)
     }
 
+    /// Borrow this `Arc` as an `ArcBorrow`
+    #[inline]
+    pub fn as_borrow<'a>(&'a self) -> &'a ArcBorrow<'a, T> {
+        unsafe {
+            std::mem::transmute(self)
+        }
+    }
+
     /// Get the reference count of this `Arc` with a given memory ordering
     #[inline]
     pub fn get_count(&self, ordering: Ordering) -> usize {
