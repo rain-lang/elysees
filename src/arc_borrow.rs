@@ -4,7 +4,7 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
 
-use super::{ArcHandle};
+use super::ArcHandle;
 
 /// A "borrowed `Arc`". This is a pointer to
 /// a T that is known to have been allocated within an

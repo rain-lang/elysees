@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
-use super::{ArcBorrow, Arc, abort};
+use super::{abort, Arc, ArcBorrow};
 
 /// A soft limit on the amount of references that may be made to an `Arc`.
 ///

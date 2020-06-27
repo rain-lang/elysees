@@ -6,7 +6,7 @@ use core::ops::Deref;
 use core::ptr;
 use core::sync::atomic::Ordering;
 
-use super::{ArcHandle, ArcBorrow};
+use super::{ArcBorrow, ArcHandle};
 
 /// An `Arc`, except it holds a pointer to the T instead of to the
 /// entire ArcInner. This struct is FFI-compatible.

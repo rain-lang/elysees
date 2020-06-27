@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::ptr;
 use core::usize;
 
-use super::{ArcHandle, ArcBorrow};
+use super::{ArcBorrow, ArcHandle};
 
 /// A tagged union that can represent `ArcHandle<A>` or `ArcHandle<B>` while only consuming a
 /// single word. The type is also `NonNull`, and thus can be stored in an Option
