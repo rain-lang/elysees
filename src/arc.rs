@@ -12,14 +12,14 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 
 /// The object allocated by an Arc<T>
 #[repr(C)]
-pub(crate) struct ArcInner<T: ?Sized> {
+pub struct ArcInner<T: ?Sized> {
     pub(crate) count: atomic::AtomicUsize,
     pub(crate) data: T,
 }
 
 impl<T: ?Sized> ArcInner<T> {
     /// Get the theoretical offset of a piece of data in an `ArcInner`
-    pub(crate) fn data_offset(data: &T) -> usize {
+    pub fn data_offset(data: &T) -> usize {
         let count_size = std::mem::size_of::<atomic::AtomicUsize>();
         let data_alignment = std::mem::align_of_val(data);
         let data_offset = ((count_size + data_alignment - 1) / data_alignment) * data_alignment;
@@ -110,5 +110,35 @@ impl<T: ?Sized> Arc<T> {
             ptr: ptr::NonNull::new_unchecked(ptr as *mut T),
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn data_offset_sanity_tests() {
+        #[allow(dead_code)]
+        struct MyStruct {
+            id: usize,
+            name: String,
+            hash: u64
+        };
+        let inner = ArcInner {
+            count: atomic::AtomicUsize::new(0),
+            data: MyStruct {
+                id: 596843,
+                name: "Jane".into(),
+                hash: 0xFF45345
+            }
+        };
+        let data = &inner.data;
+        let data_ptr = data as *const _;
+        let data_addr = data_ptr as usize;
+        let inner_addr = &inner as *const _ as usize;
+        assert_eq!(
+            data_addr - inner_addr,
+            ArcInner::data_offset(data)
+        )
     }
 }
