@@ -5,22 +5,27 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::ptr;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "stable_deref_trait")]
+use stable_deref_trait::{CloneStableDeref, StableDeref};
 
 use super::{ArcBorrow, ArcHandle};
 
 /// An atomically reference counted shared pointer
 ///
 /// See the documentation for [`Arc`] in the standard library.
-/// Unlike the standard library `Arc`, this `Arc` holds a pointer to the `T` instead of to the entire `ArcInner`. 
+/// Unlike the standard library `Arc`, this `Arc` holds a pointer to the `T` instead of to the entire `ArcInner`.
 /// This makes the struct FFI-compatible, and allows a variety of pointer casts, e.g. `&[Arc<T>]` to `&[&T]`.
 ///
 /// ```text
-///  ArcHandle<T>   Arc<T>
-///   |              |
-///   v              v
-///  ----------------------------
-/// | RefCount       | T (data) | [ArcInner<T>]
-///  ----------------------------
+///  ArcHandle<T>           Arc<T>
+///  std::sync::Arc<T>      ArcBorrow<T>
+///   |                     |
+///   v                     v
+///  -----------------------------------
+/// | RefCount              | T (data) | [ArcInner<T>]
+///  -----------------------------------
 /// ```
 ///
 /// This means that this is a direct pointer to
@@ -30,7 +35,7 @@ use super::{ArcBorrow, ArcHandle};
 /// This is very useful if you have an Arc-containing struct shared between Rust and C++,
 /// and wish for C++ to be able to read the data behind the `Arc` without incurring
 /// an FFI call overhead.
-/// 
+///
 /// [`Arc`]: https://doc.rust-lang.org/stable/std/sync/struct.Arc.html
 #[derive(Eq)]
 #[repr(transparent)]
@@ -53,13 +58,13 @@ impl<T> Deref for Arc<T> {
 impl<T> Clone for Arc<T> {
     #[inline]
     fn clone(&self) -> Self {
-        ArcHandle::into_raw_offset(self.clone_handle())
+        ArcHandle::into_arc(self.clone_handle())
     }
 }
 
 impl<T> Drop for Arc<T> {
     fn drop(&mut self) {
-        let _ = ArcHandle::from_raw_offset(Arc {
+        let _ = ArcHandle::from_arc(Arc {
             ptr: self.ptr.clone(),
             phantom: PhantomData,
         });
@@ -89,6 +94,12 @@ impl<T: Hash> Hash for Arc<T> {
 }
 
 impl<T> Arc<T> {
+    /// Construct an `Arc<T>`
+    #[inline]
+    pub fn new(data: T) -> Self {
+        ArcHandle::into_arc(ArcHandle::new(data))
+    }
+
     /// Temporarily converts `|self|` into a bonafide `ArcHandle` and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline]
@@ -128,13 +139,13 @@ impl<T> Arc<T> {
             // extract the Arc as an owned variable
             let this = ptr::read(self);
             // treat it as a real Arc
-            let mut arc = ArcHandle::from_raw_offset(this);
+            let mut arc = ArcHandle::from_arc(this);
             // obtain the mutable reference. Cast away the lifetime
             // This may mutate `arc`
             let ret = ArcHandle::make_mut(&mut arc) as *mut _;
             // Store the possibly-mutated arc back inside, after converting
             // it to a Arc again
-            ptr::write(self, ArcHandle::into_raw_offset(arc));
+            ptr::write(self, ArcHandle::into_arc(arc));
             &mut *ret
         }
     }
@@ -158,5 +169,30 @@ impl<T> Arc<T> {
     #[inline]
     pub fn get_count(&self, ordering: Ordering) -> usize {
         self.with_handle(|a| a.get_count(ordering))
+    }
+}
+
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<T> StableDeref for Arc<T> {}
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<T> CloneStableDeref for Arc<T> {}
+
+#[cfg(feature = "serde")]
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Arc<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Arc<T>, D::Error>
+    where
+        D: ::serde::de::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Arc::new)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: Serialize> Serialize for Arc<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::ser::Serializer,
+    {
+        (**self).serialize(serializer)
     }
 }

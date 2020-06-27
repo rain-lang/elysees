@@ -109,12 +109,12 @@ impl<T> ArcHandle<T> {
     /// Temporarily converts `|self|` into a bonafide `Arc` and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline(always)]
-    pub fn with_raw_offset_arc<F, U>(&self, f: F) -> U
+    pub fn with_arc<F, U>(&self, f: F) -> U
     where
         F: FnOnce(&Arc<T>) -> U,
     {
         // Synthesize transient `ArcHandle`, which never touches the refcount of the ArcInner.
-        let transient = unsafe { ManuallyDrop::new(ArcHandle::into_raw_offset(ptr::read(self))) };
+        let transient = unsafe { ManuallyDrop::new(ArcHandle::into_arc(ptr::read(self))) };
 
         // Expose the transient `ArcHandle` to the callback, which may clone it if it wants.
         let result = f(&transient);
@@ -135,7 +135,7 @@ impl<T> ArcHandle<T> {
     /// Converts an `ArcHandle` into a `Arc`. This consumes the `ArcHandle`, so the refcount
     /// is not modified.
     #[inline]
-    pub fn into_raw_offset(a: Self) -> Arc<T> {
+    pub fn into_arc(a: Self) -> Arc<T> {
         unsafe {
             Arc {
                 ptr: ptr::NonNull::new_unchecked(ArcHandle::into_raw(a) as *mut T),
@@ -147,7 +147,7 @@ impl<T> ArcHandle<T> {
     /// Converts a `Arc` into an `ArcHandle`. This consumes the `Arc`, so the refcount
     /// is not modified.
     #[inline]
-    pub fn from_raw_offset(a: Arc<T>) -> Self {
+    pub fn from_arc(a: Arc<T>) -> Self {
         let ptr = a.ptr.as_ptr();
         mem::forget(a);
         unsafe { ArcHandle::from_raw(ptr) }

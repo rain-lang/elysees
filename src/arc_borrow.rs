@@ -46,7 +46,7 @@ impl<'a, T> ArcBorrow<'a, T> {
     /// Clone this as an `Arc<T>`. This bumps the refcount.
     #[inline]
     pub fn clone_arc(&self) -> Arc<T> {
-        ArcHandle::into_raw_offset(self.clone_handle())
+        ArcHandle::into_arc(self.clone_handle())
     }
 
     /// For constructing from a reference known to be Arc-backed,
