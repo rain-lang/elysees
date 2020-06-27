@@ -18,10 +18,17 @@ pub(crate) struct ArcInner<T: ?Sized> {
 }
 
 impl<T: ?Sized> ArcInner<T> {
+    /// Get the theoretical offset of a piece of data in an `ArcInner`
+    pub(crate) fn data_offset(data: &T) -> usize {
+        let count_size = std::mem::size_of::<atomic::AtomicUsize>();
+        let data_alignment = std::mem::align_of_val(data);
+        let data_offset = ((count_size + data_alignment - 1) / data_alignment) * data_alignment;
+        data_offset
+    }
     /// Get a reference to the reference count from a data pointer
     pub(crate) unsafe fn refcount_ptr<'a>(ptr: *const T) -> &'a atomic::AtomicUsize {
-        let inner_ptr = (ptr as *const u8).sub(offset_of!(ArcInner<T>, data));
-        let count_ptr = inner_ptr.add(offset_of!(ArcInner<T>, count)) as *const atomic::AtomicUsize;
+        let data_offset = ArcInner::data_offset(&*ptr);
+        let count_ptr = (ptr as *const u8).sub(data_offset) as *const atomic::AtomicUsize;
         &(*count_ptr)
     }
 }
