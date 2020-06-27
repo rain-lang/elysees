@@ -10,8 +10,9 @@ categories = ["concurrency", "data-structures"]
 
 [features]
 std = []
-default = ["serde", "stable_deref_trait", "std"]
+default = ["serde", "stable_deref_trait", "std", "erasable"]
 
 [dependencies]
-serde = { version = "1.0", default-features = false, optional = true }
-stable_deref_trait = { version = "1.1.1", default-features = false, optional = true }
+serde = { version = "^1.0", default-features = false, optional = true }
+stable_deref_trait = { version = "^1.1", default-features = false, optional = true }
+erasable = { version = "^1.2", default-features = false, optional = true }
