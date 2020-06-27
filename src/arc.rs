@@ -32,6 +32,7 @@ pub struct ArcInner<T: ?Sized> {
 
 impl<T: ?Sized> ArcInner<T> {
     /// Get the theoretical offset of a piece of data in an `ArcInner`, as well as the layout of that `ArcInner`
+    #[inline]
     pub fn data_offset(data: &T) -> (Layout, usize) {
         let atomic_layout = Layout::new::<atomic::AtomicUsize>();
         atomic_layout
@@ -39,16 +40,19 @@ impl<T: ?Sized> ArcInner<T> {
             .unwrap_or_else(|_| abort())
     }
     /// Get an untyped pointer to the inner data from a data pointer, along with a layout
+    #[inline]
     pub(crate) unsafe fn inner_ptr<'a>(ptr: *const T) -> (Layout, *const u8) {
         let (layout, data_offset) = ArcInner::data_offset(&*ptr);
         (layout, (ptr as *const u8).sub(data_offset))
     }
     /// Get an untyped mutable pointer to the inner data from a data pointer, along with a layout
+    #[inline]
     pub(crate) unsafe fn inner_ptr_mut<'a>(ptr: *mut T) -> (Layout, *mut u8) {
         let (layout, data_offset) = ArcInner::data_offset(&*ptr);
         (layout, (ptr as *mut u8).sub(data_offset))
     }
     /// Get a reference to the reference count from a data pointer
+    #[inline]
     pub(crate) unsafe fn refcount_ptr<'a>(ptr: *const T) -> &'a atomic::AtomicUsize {
         &*(ArcInner::inner_ptr(ptr).1 as *const atomic::AtomicUsize)
     }
