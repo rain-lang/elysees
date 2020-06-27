@@ -2,6 +2,8 @@ use core::borrow::{Borrow, BorrowMut};
 use core::convert::AsRef;
 use core::hash::Hash;
 use core::ops::{Deref, DerefMut};
+#[cfg(feature = "erasable")]
+use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
@@ -32,15 +34,15 @@ use super::Arc;
 /// let data = [1, 2, 3, 4, 5];
 /// let mut x = ArcBox::new(data);
 /// let x_ptr = x.deref() as *const _;
-/// 
+///
 /// x[4] = 7; // mutate!
-/// 
+///
 /// // The allocation has been modified, but not moved
 /// assert_eq!(x.deref(), &[1, 2, 3, 4, 7]);
 /// assert_eq!(x_ptr, x.deref() as *const _);
-/// 
+///
 /// let y = x.shareable(); // y is an Arc<T>
-/// 
+///
 /// // The allocation has not been modified or moved
 /// assert_eq!(y.deref(), &[1, 2, 3, 4, 7]);
 /// assert_eq!(x_ptr, y.deref() as *const _);
@@ -130,5 +132,16 @@ impl<T: ?Sized + Serialize> Serialize for ArcBox<T> {
         S: ::serde::ser::Serializer,
     {
         (**self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "erasable")]
+unsafe impl<T: ?Sized + Erasable> ErasablePtr for ArcBox<T> {
+    fn erase(this: Self) -> ErasedPtr {
+        ErasablePtr::erase(this.0)
+    }
+
+    unsafe fn unerase(this: ErasedPtr) -> Self {
+        ArcBox(ErasablePtr::unerase(this))
     }
 }
