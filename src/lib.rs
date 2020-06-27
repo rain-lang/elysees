@@ -25,7 +25,10 @@ extern crate serde;
 extern crate stable_deref_trait;
 
 mod arc;
+mod borrow;
+
 pub use arc::*;
+pub use borrow::*;
 
 #[cfg(feature = "std")]
 use std::process::abort;

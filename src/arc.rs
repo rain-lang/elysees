@@ -1,4 +1,4 @@
-use crate::abort;
+use crate::{abort, ArcBorrow};
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::borrow;
 use core::cmp::Ordering;
@@ -116,6 +116,13 @@ impl<T> Arc<T> {
 }
 
 impl<T: ?Sized> Arc<T> {
+    /// Borrow this `Arc<T>` as an `ArcBorrow<T>`
+    #[inline]
+    pub fn borrow_arc(&self) -> ArcBorrow<T> {
+        unsafe {
+            ArcBorrow::from_ref(self.deref())
+        }
+    }
     /// Convert the `Arc<T>` to a raw pointer, suitable for use across FFI
     ///
     /// Note: This returns a pointer to the data T, which is offset in the allocation.
@@ -392,7 +399,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Arc<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<T: Serialize> Serialize for Arc<T> {
+impl<T: ?Sized + Serialize> Serialize for Arc<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ::serde::ser::Serializer,
