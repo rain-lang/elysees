@@ -52,7 +52,7 @@ unsafe impl<T: ?Sized + Sync + Send> Send for ArcHandle<T> {}
 unsafe impl<T: ?Sized + Sync + Send> Sync for ArcHandle<T> {}
 
 impl<T> ArcHandle<T> {
-    /// Construct an `Arc<T>`
+    /// Construct an `ArcHandle<T>`
     #[inline]
     pub fn new(data: T) -> Self {
         let ptr = Box::into_raw(Box::new(ArcInner {
@@ -68,7 +68,7 @@ impl<T> ArcHandle<T> {
         }
     }
 
-    /// Convert the ArcHandle<T> to a raw pointer, suitable for use across FFI
+    /// Convert the `ArcHandle<T>` to a raw pointer, suitable for use across FFI
     ///
     /// Note: This returns a pointer to the data T, which is offset in the allocation.
     ///
@@ -80,7 +80,7 @@ impl<T> ArcHandle<T> {
         ptr
     }
 
-    /// Reconstruct the ArcHandle<T> from a raw pointer obtained from into_raw()
+    /// Reconstruct the `ArcHandle<T>` from a raw pointer obtained from into_raw()
     ///
     /// Note: This raw pointer will be offset in the allocation and must be preceded
     /// by the atomic count.
@@ -98,7 +98,7 @@ impl<T> ArcHandle<T> {
     }
 
     /// Produce a pointer to the data that can be converted back
-    /// to an ArcHandle. This is basically an `&ArcHandle<T>`, without the extra indirection.
+    /// to an `ArcHandle<T>`. This is basically an `&ArcHandle<T>`, without the extra indirection.
     /// It has the benefits of an `&T` but also knows about the underlying refcount
     /// and can be converted into more `ArcHandle<T>`s if necessary.
     #[inline]
@@ -106,20 +106,20 @@ impl<T> ArcHandle<T> {
         ArcBorrow(&**self)
     }
 
-    /// Temporarily converts |self| into a bonafide Arc and exposes it to the
+    /// Temporarily converts `|self|` into a bonafide `Arc` and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline(always)]
     pub fn with_raw_offset_arc<F, U>(&self, f: F) -> U
     where
         F: FnOnce(&Arc<T>) -> U,
     {
-        // Synthesize transient ArcHandle, which never touches the refcount of the ArcInner.
+        // Synthesize transient `ArcHandle`, which never touches the refcount of the ArcInner.
         let transient = unsafe { ManuallyDrop::new(ArcHandle::into_raw_offset(ptr::read(self))) };
 
-        // Expose the transient ArcHandle to the callback, which may clone it if it wants.
+        // Expose the transient `ArcHandle` to the callback, which may clone it if it wants.
         let result = f(&transient);
 
-        // Forget the transient ArcHandle to leave the refcount untouched.
+        // Forget the transient `ArcHandle` to leave the refcount untouched.
         mem::forget(transient);
 
         // Forward the result.
@@ -177,7 +177,7 @@ impl<T: ?Sized> ArcHandle<T> {
     pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         this.ptr() == other.ptr()
     }
-
+    
     pub(crate) fn ptr(&self) -> *mut ArcInner<T> {
         self.p.as_ptr()
     }

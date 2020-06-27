@@ -115,8 +115,8 @@ impl<A, B> ArcUnion<A, B> {
 impl<A, B> Clone for ArcUnion<A, B> {
     fn clone(&self) -> Self {
         match self.borrow() {
-            ArcUnionBorrow::First(x) => ArcUnion::from_first(x.clone_arc()),
-            ArcUnionBorrow::Second(x) => ArcUnion::from_second(x.clone_arc()),
+            ArcUnionBorrow::First(x) => ArcUnion::from_first(x.clone_handle()),
+            ArcUnionBorrow::Second(x) => ArcUnion::from_second(x.clone_handle()),
         }
     }
 }

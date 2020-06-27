@@ -4,7 +4,7 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
 
-use super::ArcHandle;
+use super::{Arc, ArcHandle};
 
 /// A "borrowed `Arc`". This is a pointer to
 /// a T that is known to have been allocated within an
@@ -34,13 +34,19 @@ impl<'a, T> Clone for ArcBorrow<'a, T> {
 }
 
 impl<'a, T> ArcBorrow<'a, T> {
-    /// Clone this as an `Arc<T>`. This bumps the refcount.
+    /// Clone this as an `ArcHandle<T>`. This bumps the refcount.
     #[inline]
-    pub fn clone_arc(&self) -> ArcHandle<T> {
+    pub fn clone_handle(&self) -> ArcHandle<T> {
         let arc = unsafe { ArcHandle::from_raw(self.0) };
         // addref it!
         mem::forget(arc.clone());
         arc
+    }
+
+    /// Clone this as an `Arc<T>`. This bumps the refcount.
+    #[inline]
+    pub fn clone_arc(&self) -> Arc<T> {
+        ArcHandle::into_raw_offset(self.clone_handle())
     }
 
     /// For constructing from a reference known to be Arc-backed,

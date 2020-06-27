@@ -48,7 +48,7 @@ impl<T> Deref for Arc<T> {
 impl<T> Clone for Arc<T> {
     #[inline]
     fn clone(&self) -> Self {
-        ArcHandle::into_raw_offset(self.clone_arc())
+        ArcHandle::into_raw_offset(self.clone_handle())
     }
 }
 
@@ -87,7 +87,7 @@ impl<T> Arc<T> {
     /// Temporarily converts |self| into a bonafide Arc and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline]
-    pub fn with_arc<F, U>(&self, f: F) -> U
+    pub fn with_handle<F, U>(&self, f: F) -> U
     where
         F: FnOnce(&ArcHandle<T>) -> U,
     {
@@ -125,10 +125,10 @@ impl<T> Arc<T> {
         }
     }
 
-    /// Clone it as an `Arc`
+    /// Clone it as an `ArcHandle`
     #[inline]
-    pub fn clone_arc(&self) -> ArcHandle<T> {
-        Arc::with_arc(self, |a| a.clone())
+    pub fn clone_handle(&self) -> ArcHandle<T> {
+        Arc::with_handle(self, |a| a.clone())
     }
 
     /// Produce a pointer to the data that can be converted back
@@ -139,7 +139,8 @@ impl<T> Arc<T> {
     }
 
     /// Get the reference count of this `Arc` with a given memory ordering
+    #[inline]
     pub fn get_count(&self, ordering: Ordering) -> usize {
-        self.with_arc(|a| a.get_count(ordering))
+        self.with_handle(|a| a.get_count(ordering))
     }
 }
