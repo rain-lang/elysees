@@ -3,6 +3,8 @@ use core::mem;
 use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "stable_deref_trait")]
+use stable_deref_trait::{CloneStableDeref, StableDeref};
 
 use super::{Arc, ArcHandle};
 
@@ -104,3 +106,8 @@ impl<'a, T> Deref for ArcBorrow<'a, T> {
         self.0
     }
 }
+
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<'a, T> StableDeref for ArcBorrow<'a, T> {}
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<'a, T> CloneStableDeref for ArcBorrow<'a, T> {}
