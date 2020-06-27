@@ -8,8 +8,11 @@ use core::sync::atomic::Ordering;
 
 use super::{ArcBorrow, ArcHandle};
 
-/// An `Arc`, except it holds a pointer to the T instead of to the
-/// entire ArcInner. This struct is FFI-compatible.
+/// An atomically reference counted shared pointer
+///
+/// See the documentation for [`Arc`] in the standard library.
+/// Unlike the standard library `Arc`, this `Arc` holds a pointer to the `T` instead of to the entire `ArcInner`. 
+/// This makes the struct FFI-compatible, and allows a variety of pointer casts, e.g. `&[Arc<T>]` to `&[&T]`.
 ///
 /// ```text
 ///  ArcHandle<T>   Arc<T>
@@ -22,11 +25,13 @@ use super::{ArcBorrow, ArcHandle};
 ///
 /// This means that this is a direct pointer to
 /// its contained data (and can be read from by both C++ and Rust),
-/// but we can also convert it to a "regular" Arc<T> by removing the offset.
+/// but we can also convert it to an `ArcHandle<T>` by removing the offset.
 ///
 /// This is very useful if you have an Arc-containing struct shared between Rust and C++,
 /// and wish for C++ to be able to read the data behind the `Arc` without incurring
 /// an FFI call overhead.
+/// 
+/// [`Arc`]: https://doc.rust-lang.org/stable/std/sync/struct.Arc.html
 #[derive(Eq)]
 #[repr(transparent)]
 pub struct Arc<T> {
