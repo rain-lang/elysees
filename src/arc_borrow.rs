@@ -65,10 +65,10 @@ impl<'a, T> ArcBorrow<'a, T> {
         this.0 as *const T == other.0 as *const T
     }
 
-    /// Temporarily converts |self| into a bonafide Arc and exposes it to the
+    /// Temporarily converts `|self|` into a bonafide `ArcHandle` and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline]
-    pub fn with_arc<F, U>(&self, f: F) -> U
+    pub fn with_handle<F, U>(&self, f: F) -> U
     where
         F: FnOnce(&ArcHandle<T>) -> U,
         T: 'static,
@@ -94,7 +94,7 @@ impl<'a, T> ArcBorrow<'a, T> {
     where
         T: 'static,
     {
-        self.with_arc(|a| a.get_count(ordering))
+        self.with_handle(|a| a.get_count(ordering))
     }
 }
 
