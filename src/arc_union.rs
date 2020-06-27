@@ -4,14 +4,14 @@ use core::marker::PhantomData;
 use core::ptr;
 use core::usize;
 
-use super::{Arc, ArcBorrow};
+use super::{ArcHandle, ArcBorrow};
 
-/// A tagged union that can represent `Arc<A>` or `Arc<B>` while only consuming a
+/// A tagged union that can represent `ArcHandle<A>` or `ArcHandle<B>` while only consuming a
 /// single word. The type is also `NonNull`, and thus can be stored in an Option
 /// without increasing size.
 ///
 /// This is functionally equivalent to
-/// `enum ArcUnion<A, B> { First(Arc<A>), Second(Arc<B>)` but only takes up
+/// `enum ArcUnion<A, B> { First(ArcHandle<A>), Second(ArcHandle<B>)` but only takes up
 /// up a single word of stack space.
 ///
 /// This could probably be extended to support four types if necessary.
@@ -73,14 +73,14 @@ impl<A, B> ArcUnion<A, B> {
 
     /// Creates an `ArcUnion` from an instance of the first type.
     #[inline]
-    pub fn from_first(other: Arc<A>) -> Self {
-        unsafe { Self::new(Arc::into_raw(other) as *mut _) }
+    pub fn from_first(other: ArcHandle<A>) -> Self {
+        unsafe { Self::new(ArcHandle::into_raw(other) as *mut _) }
     }
 
     /// Creates an `ArcUnion` from an instance of the second type.
     #[inline]
-    pub fn from_second(other: Arc<B>) -> Self {
-        unsafe { Self::new(((Arc::into_raw(other) as usize) | 0x1) as *mut _) }
+    pub fn from_second(other: ArcHandle<B>) -> Self {
+        unsafe { Self::new(((ArcHandle::into_raw(other) as usize) | 0x1) as *mut _) }
     }
 
     /// Returns true if this `ArcUnion` contains the first type.
@@ -125,10 +125,10 @@ impl<A, B> Drop for ArcUnion<A, B> {
     fn drop(&mut self) {
         match self.borrow() {
             ArcUnionBorrow::First(x) => unsafe {
-                let _ = Arc::from_raw(&*x);
+                let _ = ArcHandle::from_raw(&*x);
             },
             ArcUnionBorrow::Second(x) => unsafe {
-                let _ = Arc::from_raw(&*x);
+                let _ = ArcHandle::from_raw(&*x);
             },
         }
     }

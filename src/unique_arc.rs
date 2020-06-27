@@ -5,9 +5,9 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::sync::atomic;
 
-use super::{Arc, ArcInner};
+use super::{ArcHandle, ArcInner};
 
-/// An `Arc` that is known to be uniquely owned
+/// An `ArcHandle` that is known to be uniquely owned
 ///
 /// When `Arc`s are constructed, they are known to be
 /// uniquely owned. In such a case it is safe to mutate
@@ -32,18 +32,18 @@ use super::{Arc, ArcInner};
 /// ```
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct UniqueArc<T: ?Sized>(Arc<T>);
+pub struct UniqueArc<T: ?Sized>(ArcHandle<T>);
 
 impl<T> UniqueArc<T> {
     #[inline]
     /// Construct a new UniqueArc
     pub fn new(data: T) -> Self {
-        UniqueArc(Arc::new(data))
+        UniqueArc(ArcHandle::new(data))
     }
 
     #[inline]
     /// Convert to a shareable Arc<T> once we're done mutating it
-    pub fn shareable(self) -> Arc<T> {
+    pub fn shareable(self) -> ArcHandle<T> {
         self.0
     }
 
@@ -58,7 +58,7 @@ impl<T> UniqueArc<T> {
                 .cast::<ArcInner<mem::MaybeUninit<T>>>();
             ptr::write(&mut p.as_mut().count, atomic::AtomicUsize::new(1));
 
-            UniqueArc(Arc {
+            UniqueArc(ArcHandle {
                 p,
                 phantom: PhantomData,
             })
@@ -76,7 +76,7 @@ impl<T> UniqueArc<mem::MaybeUninit<T>> {
     /// has actually been initialized before calling this method.
     #[inline]
     pub unsafe fn assume_init(this: Self) -> UniqueArc<T> {
-        UniqueArc(Arc {
+        UniqueArc(ArcHandle {
             p: mem::ManuallyDrop::new(this).0.p.cast(),
             phantom: PhantomData,
         })

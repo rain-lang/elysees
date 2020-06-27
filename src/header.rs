@@ -7,7 +7,7 @@ use core::slice;
 use core::sync::atomic;
 use core::usize;
 
-use super::{Arc, ArcInner};
+use super::{ArcHandle, ArcInner};
 
 /// Structure to allow Arc-managing some fixed-sized data and a variably-sized
 /// slice in a single allocation.
@@ -20,7 +20,7 @@ pub struct HeaderSlice<H, T: ?Sized> {
     pub slice: T,
 }
 
-impl<H, T> Arc<HeaderSlice<H, [T]>> {
+impl<H, T> ArcHandle<HeaderSlice<H, [T]>> {
     /// Creates an Arc for a HeaderSlice using the given header struct and
     /// iterator to generate the slice. The resulting Arc will be fat.
     pub fn from_header_and_iter<I>(header: H, mut items: I) -> Self
@@ -107,7 +107,7 @@ impl<H, T> Arc<HeaderSlice<H, [T]>> {
             "The Arc will be fat"
         );
         unsafe {
-            Arc {
+            ArcHandle {
                 p: ptr::NonNull::new_unchecked(ptr),
                 phantom: PhantomData,
             }

@@ -19,7 +19,7 @@
 //! * `elysees::Arc` has can be constructed for dynamically-sized types via `from_header_and_iter`
 //! * `elysees::ThinArc` provides thin-pointer `Arc`s to dynamically sized types
 //! * `elysees::ArcUnion` is union of two `elysees:Arc`s which fits inside one word of memory
-//! 
+//!
 //!  This currently just adds a getter to the refcount, but some other additional features are planned, including 3 and 4-variant `ArcUnion`s, and `ArcUnion`s with `ThinArc`s.
 
 #![allow(missing_docs)]
@@ -37,18 +37,18 @@ extern crate serde;
 extern crate stable_deref_trait;
 
 mod arc;
-mod header;
-mod arc_union;
 mod arc_borrow;
-mod offset_arc;
+mod arc_handle;
+mod arc_union;
+mod header;
 mod thin_arc;
 mod unique_arc;
 
 pub use arc::*;
-pub use header::*;
-pub use arc_union::*;
 pub use arc_borrow::*;
-pub use offset_arc::*;
+pub use arc_handle::*;
+pub use arc_union::*;
+pub use header::*;
 pub use thin_arc::*;
 pub use unique_arc::*;
 

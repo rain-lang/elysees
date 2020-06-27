@@ -4,20 +4,20 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
 
-use super::Arc;
+use super::{ArcHandle};
 
 /// A "borrowed `Arc`". This is a pointer to
 /// a T that is known to have been allocated within an
 /// `Arc`.
 ///
-/// This is equivalent in guarantees to `&Arc<T>`, however it is
-/// a bit more flexible. To obtain an `&Arc<T>` you must have
-/// an `Arc<T>` instance somewhere pinned down until we're done with it.
+/// This is equivalent in guarantees to `&ArcHandle<T>`, however it is
+/// a bit more flexible. To obtain an `&ArcHandle<T>` you must have
+/// an `ArcHandle<T>` instance somewhere pinned down until we're done with it.
 /// It's also a direct pointer to `T`, so using this involves less pointer-chasing
 ///
 /// However, C++ code may hand us refcounted things as pointers to T directly,
 /// so we have to conjure up a temporary `Arc` on the stack each time. The
-/// same happens for when the object is managed by a `OffsetArc`.
+/// same happens for when the object is managed by a `Arc`.
 ///
 /// `ArcBorrow` lets us deal with borrows of known-refcounted objects
 /// without needing to worry about where the `Arc<T>` is.
@@ -36,8 +36,8 @@ impl<'a, T> Clone for ArcBorrow<'a, T> {
 impl<'a, T> ArcBorrow<'a, T> {
     /// Clone this as an `Arc<T>`. This bumps the refcount.
     #[inline]
-    pub fn clone_arc(&self) -> Arc<T> {
-        let arc = unsafe { Arc::from_raw(self.0) };
+    pub fn clone_arc(&self) -> ArcHandle<T> {
+        let arc = unsafe { ArcHandle::from_raw(self.0) };
         // addref it!
         mem::forget(arc.clone());
         arc
@@ -62,11 +62,11 @@ impl<'a, T> ArcBorrow<'a, T> {
     #[inline]
     pub fn with_arc<F, U>(&self, f: F) -> U
     where
-        F: FnOnce(&Arc<T>) -> U,
+        F: FnOnce(&ArcHandle<T>) -> U,
         T: 'static,
     {
         // Synthesize transient Arc, which never touches the refcount.
-        let transient = unsafe { ManuallyDrop::new(Arc::from_raw(self.0)) };
+        let transient = unsafe { ManuallyDrop::new(ArcHandle::from_raw(self.0)) };
 
         // Expose the transient Arc to the callback, which may clone it if it wants.
         let result = f(&transient);
