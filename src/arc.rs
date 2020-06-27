@@ -3,7 +3,7 @@ use alloc::alloc::{alloc, dealloc, Layout};
 use core::marker::PhantomData;
 use core::mem;
 use core::ptr;
-use core::sync::atomic;
+use core::sync::atomic::{self, Ordering::*};
 
 /// A soft limit on the amount of references that may be made to an `Arc`.
 ///
@@ -26,11 +26,19 @@ impl<T: ?Sized> ArcInner<T> {
             .extend(Layout::for_value(data))
             .unwrap_or_else(|_| abort())
     }
+    /// Get an untyped pointer to the inner data from a data pointer, along with a layout
+    pub(crate) unsafe fn inner_ptr<'a>(ptr: *const T) -> (Layout, *const u8) {
+        let (layout, data_offset) = ArcInner::data_offset(&*ptr);
+        (layout, (ptr as *const u8).sub(data_offset))
+    }
+    /// Get an untyped mutable pointer to the inner data from a data pointer, along with a layout
+    pub(crate) unsafe fn inner_ptr_mut<'a>(ptr: *mut T) -> (Layout, *mut u8) {
+        let (layout, data_offset) = ArcInner::data_offset(&*ptr);
+        (layout, (ptr as *mut u8).sub(data_offset))
+    }
     /// Get a reference to the reference count from a data pointer
     pub(crate) unsafe fn refcount_ptr<'a>(ptr: *const T) -> &'a atomic::AtomicUsize {
-        let (_layout, data_offset) = ArcInner::data_offset(&*ptr);
-        let count_ptr = (ptr as *const u8).sub(data_offset) as *const atomic::AtomicUsize;
-        &(*count_ptr)
+        &*(ArcInner::inner_ptr(ptr).1 as *const atomic::AtomicUsize)
     }
 }
 
@@ -110,6 +118,59 @@ impl<T: ?Sized> Arc<T> {
         Arc {
             ptr: ptr::NonNull::new_unchecked(ptr as *mut T),
             phantom: PhantomData,
+        }
+    }
+    // Non-inlined part of `drop`. Just invokes the destructor.
+    #[inline(never)]
+    unsafe fn drop_slow(&mut self) {
+        // Step 1: drop data
+        ptr::drop_in_place(self.ptr.as_ptr());
+        // Step 2: free Inner
+        let (layout, data) = ArcInner::inner_ptr_mut(self.ptr.as_ptr());
+        dealloc(data, layout)
+    }
+    /// Get a reference to the reference count of this `Arc`
+    #[inline]
+    fn borrow_refcount(&self) -> &atomic::AtomicUsize {
+        unsafe {
+            ArcInner::refcount_ptr(self.ptr.as_ptr())
+        }
+    }
+}
+
+impl<T: ?Sized> Drop for Arc<T> {
+    #[inline]
+    fn drop(&mut self) {
+        // Because `fetch_sub` is already atomic, we do not need to synchronize
+        // with other threads unless we are going to delete the object.
+        if self.borrow_refcount().fetch_sub(1, Release) != 1 {
+            return;
+        }
+
+        // FIXME(bholley): Use the updated comment when [2] is merged.
+        //
+        // This load is needed to prevent reordering of use of the data and
+        // deletion of the data.  Because it is marked `Release`, the decreasing
+        // of the reference count synchronizes with this `Acquire` load. This
+        // means that use of the data happens before decreasing the reference
+        // count, which happens before this load, which happens before the
+        // deletion of the data.
+        //
+        // As explained in the [Boost documentation][1],
+        //
+        // > It is important to enforce any possible access to the object in one
+        // > thread (through an existing reference) to *happen before* deleting
+        // > the object in a different thread. This is achieved by a "release"
+        // > operation after dropping a reference (any access to the object
+        // > through this reference must obviously happened before), and an
+        // > "acquire" operation before deleting the object.
+        //
+        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
+        // [2]: https://github.com/rust-lang/rust/pull/41714
+        self.borrow_refcount().load(Acquire);
+
+        unsafe {
+            self.drop_slow();
         }
     }
 }
