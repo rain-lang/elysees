@@ -51,6 +51,34 @@ impl<'a, T> ArcBorrow<'a, T> {
         ArcHandle::into_arc(self.clone_handle())
     }
 
+    /// Borrow this as an `Arc<T>`. This does *not* bump the refcount.
+    #[inline]
+    pub fn as_arc(&self) -> &Arc<T> {
+        unsafe {
+            std::mem::transmute(self)
+        }
+    }
+
+    /// Borrow this as an `&T`.
+    #[inline]
+    pub fn as_double_ref(&self) -> &&'a T {
+        &self.0
+    }
+
+    /// Get this `ArcBorrow` as a pointer.
+    #[inline]
+    pub fn as_ptr(&self) -> *const T {
+        self.0
+    }
+
+    /// Borrow this `ArcBorrow` as a pointer
+    #[inline]
+    pub fn borrow_ptr(&self) -> &*const T {
+        unsafe {
+            std::mem::transmute(&self.0)
+        }
+    }
+
     /// For constructing from a reference known to be Arc-backed,
     /// e.g. if we obtain such a reference over FFI
     #[inline]
@@ -89,6 +117,7 @@ impl<'a, T> ArcBorrow<'a, T> {
     pub fn get(&self) -> &'a T {
         self.0
     }
+
     /// Get the reference count of this `Arc` with a given memory ordering
     pub fn get_count(&self, ordering: Ordering) -> usize
     where
