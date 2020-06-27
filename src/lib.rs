@@ -19,8 +19,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate core;
 
-#[macro_use]
-extern crate memoffset;
 #[cfg(feature = "serde")]
 extern crate serde;
 #[cfg(feature = "stable_deref_trait")]

@@ -132,9 +132,7 @@ impl<T: ?Sized> Arc<T> {
     /// Get a reference to the reference count of this `Arc`
     #[inline]
     fn borrow_refcount(&self) -> &atomic::AtomicUsize {
-        unsafe {
-            ArcInner::refcount_ptr(self.ptr.as_ptr())
-        }
+        unsafe { ArcInner::refcount_ptr(self.ptr.as_ptr()) }
     }
 }
 
@@ -171,6 +169,42 @@ impl<T: ?Sized> Drop for Arc<T> {
 
         unsafe {
             self.drop_slow();
+        }
+    }
+}
+
+impl<T: ?Sized> Clone for Arc<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        // Using a relaxed ordering is alright here, as knowledge of the
+        // original reference prevents other threads from erroneously deleting
+        // the object.
+        //
+        // As explained in the [Boost documentation][1], Increasing the
+        // reference counter can always be done with memory_order_relaxed: New
+        // references to an object can only be formed from an existing
+        // reference, and passing an existing reference from one thread to
+        // another must already provide any required synchronization.
+        //
+        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
+        let old_size = self.borrow_refcount().fetch_add(1, Relaxed);
+
+        // However we need to guard against massive refcounts in case someone
+        // is `mem::forget`ing Arcs. If we don't do this the count can overflow
+        // and users will use-after free. We racily saturate to `isize::MAX` on
+        // the assumption that there aren't ~2 billion threads incrementing
+        // the reference count at once. This branch will never be taken in
+        // any realistic program.
+        //
+        // We abort because such a program is incredibly degenerate, and we
+        // don't care to support it.
+        if old_size > MAX_REFCOUNT {
+            abort();
+        }
+
+        Arc {
+            ptr: self.ptr,
+            phantom: PhantomData,
         }
     }
 }
