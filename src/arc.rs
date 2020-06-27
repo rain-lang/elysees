@@ -1,9 +1,22 @@
 use crate::abort;
 use alloc::alloc::{alloc, dealloc, Layout};
+use core::borrow;
+use core::cmp::Ordering;
+use core::convert::From;
+use core::fmt;
+use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::mem;
+use core::ops::Deref;
 use core::ptr;
-use core::sync::atomic::{self, Ordering::*};
+use core::sync::atomic;
+use core::sync::atomic::Ordering::{self as LoadOrdering, Acquire, Relaxed, Release};
+use core::{isize, usize};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "stable_deref_trait")]
+use stable_deref_trait::{CloneStableDeref, StableDeref};
+
 
 /// A soft limit on the amount of references that may be made to an `Arc`.
 ///
@@ -109,6 +122,11 @@ impl<T: ?Sized> Arc<T> {
         mem::forget(this);
         ptr.as_ptr()
     }
+    /// Get the raw pointer underlying this `Arc<T>`
+    #[inline]
+    pub fn as_ptr(this: &Arc<T>) -> *const T {
+        this.ptr.as_ptr()
+    }
     /// Convert the `Arc<T>` from a raw pointer obtained from `into_raw()`
     ///
     /// Note: This raw pointer will be offset in the allocation and must be preceded
@@ -133,6 +151,11 @@ impl<T: ?Sized> Arc<T> {
     #[inline]
     fn borrow_refcount(&self) -> &atomic::AtomicUsize {
         unsafe { ArcInner::refcount_ptr(self.ptr.as_ptr()) }
+    }
+    /// Get the reference count of this `Arc` with a given ordering
+    #[inline]
+    pub fn count(this: &Arc<T>, ordering: LoadOrdering) -> usize {
+        this.borrow_refcount().load(ordering)
     }
 }
 
@@ -206,6 +229,135 @@ impl<T: ?Sized> Clone for Arc<T> {
             ptr: self.ptr,
             phantom: PhantomData,
         }
+    }
+}
+
+impl<T: ?Sized> Deref for Arc<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        unsafe {
+            &*self.ptr.as_ptr()
+        }
+    }
+}
+
+impl<T: ?Sized + PartialEq> PartialEq for Arc<T> {
+    fn eq(&self, other: &Arc<T>) -> bool {
+        *(*self) == *(*other)
+    }
+
+    fn ne(&self, other: &Arc<T>) -> bool {
+        *(*self) != *(*other)
+    }
+}
+
+impl<T: ?Sized + PartialOrd> PartialOrd for Arc<T> {
+    fn partial_cmp(&self, other: &Arc<T>) -> Option<Ordering> {
+        (**self).partial_cmp(&**other)
+    }
+
+    fn lt(&self, other: &Arc<T>) -> bool {
+        *(*self) < *(*other)
+    }
+
+    fn le(&self, other: &Arc<T>) -> bool {
+        *(*self) <= *(*other)
+    }
+
+    fn gt(&self, other: &Arc<T>) -> bool {
+        *(*self) > *(*other)
+    }
+
+    fn ge(&self, other: &Arc<T>) -> bool {
+        *(*self) >= *(*other)
+    }
+}
+
+impl<T: ?Sized + Ord> Ord for Arc<T> {
+    fn cmp(&self, other: &Arc<T>) -> Ordering {
+        (**self).cmp(&**other)
+    }
+}
+
+impl<T: ?Sized + Eq> Eq for Arc<T> {}
+
+impl<T: ?Sized + fmt::Display> fmt::Display for Arc<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&**self, f)
+    }
+}
+
+impl<T: ?Sized + fmt::Debug> fmt::Debug for Arc<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+impl<T: ?Sized> fmt::Pointer for Arc<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Pointer::fmt(&Arc::as_ptr(self), f)
+    }
+}
+
+impl<T: Default> Default for Arc<T> {
+    #[inline]
+    fn default() -> Arc<T> {
+        Arc::new(Default::default())
+    }
+}
+
+impl<T: ?Sized + Hash> Hash for Arc<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
+impl<T> From<T> for Arc<T> {
+    #[inline]
+    fn from(t: T) -> Self {
+        Arc::new(t)
+    }
+}
+
+impl<T: ?Sized> borrow::Borrow<T> for Arc<T> {
+    #[inline]
+    fn borrow(&self) -> &T {
+        &**self
+    }
+}
+
+impl<T: ?Sized> AsRef<T> for Arc<T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        &**self
+    }
+}
+
+
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<T: ?Sized> StableDeref for Arc<T> {}
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<T: ?Sized> CloneStableDeref for Arc<T> {}
+
+#[cfg(feature = "serde")]
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Arc<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Arc<T>, D::Error>
+    where
+        D: ::serde::de::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Arc::new)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: Serialize> Serialize for Arc<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::ser::Serializer,
+    {
+        (**self).serialize(serializer)
     }
 }
 
