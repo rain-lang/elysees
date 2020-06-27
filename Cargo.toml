@@ -1,6 +1,6 @@
 [package]
 name = "elysees"
-version = "0.0.4"
+version = "0.0.3"
 authors = ["Jad Elkhaleq Ghalayini", "The Servo Project Developers"]
 license = "MIT/Apache-2.0"
 repository = "https://gitlab.com/rain-lang/elysees"
@@ -13,5 +13,6 @@ std = []
 default = ["serde", "stable_deref_trait", "std"]
 
 [dependencies]
+memoffset = "0.5.3"
 serde = { version = "1.0", default-features = false, optional = true }
 stable_deref_trait = { version = "1.1.1", default-features = false, optional = true }

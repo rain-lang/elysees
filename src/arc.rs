@@ -1,65 +1,19 @@
-use crate::{abort, ArcBorrow};
-use alloc::alloc::{alloc, dealloc, Layout};
-use core::borrow;
-use core::cmp::Ordering;
-use core::convert::From;
+use core::borrow::Borrow;
+use core::convert::AsRef;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
-use core::mem;
+use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::ptr;
-use core::sync::atomic;
-use core::sync::atomic::Ordering::{self as LoadOrdering, Acquire, Relaxed, Release};
-use core::{isize, usize};
+use core::sync::atomic::Ordering;
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
-/// A soft limit on the amount of references that may be made to an `Arc`.
-///
-/// Going above this limit will abort your program (although not
-/// necessarily) at _exactly_ `MAX_REFCOUNT + 1` references.
-const MAX_REFCOUNT: usize = (isize::MAX) as usize;
-
-/// The object allocated by an Arc<T>
-#[repr(C)]
-pub struct ArcInner<T: ?Sized> {
-    pub(crate) count: atomic::AtomicUsize,
-    pub(crate) data: T,
-}
-
-impl<T: ?Sized> ArcInner<T> {
-    /// Get the theoretical offset of a piece of data in an `ArcInner`, as well as the layout of that `ArcInner`
-    #[inline]
-    pub fn data_offset(data: &T) -> (Layout, usize) {
-        let atomic_layout = Layout::new::<atomic::AtomicUsize>();
-        atomic_layout
-            .extend(Layout::for_value(data))
-            .unwrap_or_else(|_| abort())
-    }
-    /// Get an untyped pointer to the inner data from a data pointer, along with a layout
-    #[inline]
-    pub(crate) unsafe fn inner_ptr<'a>(ptr: *const T) -> (Layout, *const u8) {
-        let (layout, data_offset) = ArcInner::data_offset(&*ptr);
-        (layout, (ptr as *const u8).sub(data_offset))
-    }
-    /// Get an untyped mutable pointer to the inner data from a data pointer, along with a layout
-    #[inline]
-    pub(crate) unsafe fn inner_ptr_mut<'a>(ptr: *mut T) -> (Layout, *mut u8) {
-        let (layout, data_offset) = ArcInner::data_offset(&*ptr);
-        (layout, (ptr as *mut u8).sub(data_offset))
-    }
-    /// Get a reference to the reference count from a data pointer
-    #[inline]
-    pub(crate) unsafe fn refcount_ptr<'a>(ptr: *const T) -> &'a atomic::AtomicUsize {
-        &*(ArcInner::inner_ptr(ptr).1 as *const atomic::AtomicUsize)
-    }
-}
-
-unsafe impl<T: ?Sized + Sync + Send> Send for ArcInner<T> {}
-unsafe impl<T: ?Sized + Sync + Send> Sync for ArcInner<T> {}
+use super::{ArcBorrow, ArcHandle};
 
 /// An atomically reference counted shared pointer
 ///
@@ -68,211 +22,105 @@ unsafe impl<T: ?Sized + Sync + Send> Sync for ArcInner<T> {}
 /// This makes the struct FFI-compatible, and allows a variety of pointer casts, e.g. `&[Arc<T>]` to `&[&T]`.
 ///
 /// ```text
-///   std::sync::Arc<T>     elysees::Arc<T>
+///  ArcHandle<T>           Arc<T>
+///  std::sync::Arc<T>      ArcBorrow<T>
 ///   |                     |
 ///   v                     v
-///  --------------------------------------
-/// | RefCount            | T (data)       | [ArcInner<T>]
-///  --------------------------------------
+///  -----------------------------------
+/// | RefCount              | T (data) | [ArcInner<T>]
+///  -----------------------------------
 /// ```
 ///
-/// This means that this is a direct pointer to its contained data (and can be read from by both C/C++ and Rust)
+/// This means that this is a direct pointer to
+/// its contained data (and can be read from by both C++ and Rust),
+/// but we can also convert it to an `ArcHandle<T>` by removing the offset.
 ///
-/// This is very useful if you have an Arc-containing struct shared between Rust and C/C++,
-/// and wish for C/C++ to be able to read the data behind the `Arc` without incurring
-/// an FFI call overhead. This also enables a variety of useful casts, which are provided as safe functions by
-/// the library, e.g. &Arc<T> -> &*const T, which can help with safe implementation of complex `ByAddress`
-/// datastructures
+/// This is very useful if you have an Arc-containing struct shared between Rust and C++,
+/// and wish for C++ to be able to read the data behind the `Arc` without incurring
+/// an FFI call overhead.
 ///
 /// [`Arc`]: https://doc.rust-lang.org/stable/std/sync/struct.Arc.html
+#[derive(Eq)]
 #[repr(transparent)]
-pub struct Arc<T: ?Sized> {
+pub struct Arc<T> {
     pub(crate) ptr: ptr::NonNull<T>,
     pub(crate) phantom: PhantomData<T>,
 }
 
-unsafe impl<T: ?Sized + Sync + Send> Send for Arc<T> {}
-unsafe impl<T: ?Sized + Sync + Send> Sync for Arc<T> {}
+unsafe impl<T: Sync + Send> Send for Arc<T> {}
+unsafe impl<T: Sync + Send> Sync for Arc<T> {}
+
+impl<T> Deref for Arc<T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.ptr.as_ptr() }
+    }
+}
+
+impl<T> Clone for Arc<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        ArcHandle::into_arc(self.clone_handle())
+    }
+}
+
+impl<T> Drop for Arc<T> {
+    fn drop(&mut self) {
+        let _ = ArcHandle::from_arc(Arc {
+            ptr: self.ptr.clone(),
+            phantom: PhantomData,
+        });
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Arc<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+impl<T: PartialEq> PartialEq for Arc<T> {
+    fn eq(&self, other: &Arc<T>) -> bool {
+        *(*self) == *(*other)
+    }
+
+    fn ne(&self, other: &Arc<T>) -> bool {
+        *(*self) != *(*other)
+    }
+}
+
+impl<T: Hash> Hash for Arc<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
 
 impl<T> Arc<T> {
     /// Construct an `Arc<T>`
     #[inline]
     pub fn new(data: T) -> Self {
-        let inner = ArcInner {
-            count: atomic::AtomicUsize::new(0),
-            data,
-        };
-        let layout = Layout::for_value(&inner);
-        let alloc_ref = unsafe {
-            let allocation = alloc(layout) as *mut ArcInner<T>;
-            ptr::write(allocation, inner);
-            &*allocation
-        };
-        Arc {
-            ptr: (&alloc_ref.data).into(),
-            phantom: PhantomData,
-        }
+        ArcHandle::into_arc(ArcHandle::new(data))
     }
-}
 
-impl<T: ?Sized> Arc<T> {
-    /// Borrow this `Arc<T>` as an `ArcBorrow<T>`
+    /// Temporarily converts `|self|` into a bonafide `ArcHandle` and exposes it to the
+    /// provided callback. The refcount is not modified.
     #[inline]
-    pub fn borrow_arc(&self) -> ArcBorrow<T> {
-        unsafe {
-            ArcBorrow::from_ref(self.deref())
-        }
-    }
-    /// Leak this `Arc<T>`, getting an `ArcBorrow<'static, T>`
-    /// 
-    /// You can call the `get` method on the returned `ArcBorrow` to get an `&'static T`. 
-    /// Note that using this can (obviously) cause memory leaks!
-    #[inline]
-    pub fn leak(this: Arc<T>) -> ArcBorrow<'static, T> {
-        let result = unsafe {
-            ArcBorrow::from_ref(&*this.ptr.as_ptr())
-        };
-        mem::forget(this);
+    pub fn with_handle<F, U>(&self, f: F) -> U
+    where
+        F: FnOnce(&ArcHandle<T>) -> U,
+    {
+        // Synthesize transient Arc, which never touches the refcount of the ArcInner.
+        let transient = unsafe { ManuallyDrop::new(ArcHandle::from_raw(self.ptr.as_ptr())) };
+
+        // Expose the transient Arc to the callback, which may clone it if it wants.
+        let result = f(&transient);
+
+        // Forward the result.
         result
     }
-    /// Convert the `Arc<T>` to a raw pointer, suitable for use across FFI
-    ///
-    /// Note: This returns a pointer to the data T, which is offset in the allocation.
-    #[inline]
-    pub fn into_raw(this: Self) -> *const T {
-        let ptr = this.ptr;
-        mem::forget(this);
-        ptr.as_ptr()
-    }
-    /// Get the raw pointer underlying this `Arc<T>`
-    #[inline]
-    pub fn as_ptr(this: &Arc<T>) -> *const T {
-        this.ptr.as_ptr()
-    }
-    /// Convert the `Arc<T>` from a raw pointer obtained from `into_raw()`
-    ///
-    /// Note: This raw pointer will be offset in the allocation and must be preceded
-    /// by the atomic count.
-    #[inline]
-    pub unsafe fn from_raw(ptr: *const T) -> Arc<T> {
-        Arc {
-            ptr: ptr::NonNull::new_unchecked(ptr as *mut T),
-            phantom: PhantomData,
-        }
-    }
-    // Non-inlined part of `drop`. Just invokes the destructor.
-    #[inline(never)]
-    unsafe fn drop_slow(&mut self) {
-        // Step 1: drop data
-        ptr::drop_in_place(self.ptr.as_ptr());
-        // Step 2: free Inner
-        let (layout, data) = ArcInner::inner_ptr_mut(self.ptr.as_ptr());
-        dealloc(data, layout)
-    }
-    /// Get a reference to the reference count of this `Arc`
-    #[inline]
-    fn borrow_refcount(&self) -> &atomic::AtomicUsize {
-        unsafe { ArcInner::refcount_ptr(self.ptr.as_ptr()) }
-    }
-    /// Whether or not the `Arc` is uniquely owned (is the refcount 1?).
-    #[inline]
-    pub fn is_unique(&self) -> bool {
-        // See the extensive discussion in [1] for why this needs to be Acquire.
-        //
-        // [1] https://github.com/servo/servo/issues/21186
-        Arc::count(self, Acquire) == 1
-    }
-    /// Get the reference count of this `Arc` with a given ordering
-    #[inline]
-    pub fn count(this: &Arc<T>, ordering: LoadOrdering) -> usize {
-        this.borrow_refcount().load(ordering)
-    }
-}
 
-impl<T: ?Sized> Drop for Arc<T> {
-    #[inline]
-    fn drop(&mut self) {
-        // Because `fetch_sub` is already atomic, we do not need to synchronize
-        // with other threads unless we are going to delete the object.
-        if self.borrow_refcount().fetch_sub(1, Release) != 1 {
-            return;
-        }
-
-        // FIXME(bholley): Use the updated comment when [2] is merged.
-        //
-        // This load is needed to prevent reordering of use of the data and
-        // deletion of the data.  Because it is marked `Release`, the decreasing
-        // of the reference count synchronizes with this `Acquire` load. This
-        // means that use of the data happens before decreasing the reference
-        // count, which happens before this load, which happens before the
-        // deletion of the data.
-        //
-        // As explained in the [Boost documentation][1],
-        //
-        // > It is important to enforce any possible access to the object in one
-        // > thread (through an existing reference) to *happen before* deleting
-        // > the object in a different thread. This is achieved by a "release"
-        // > operation after dropping a reference (any access to the object
-        // > through this reference must obviously happened before), and an
-        // > "acquire" operation before deleting the object.
-        //
-        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        // [2]: https://github.com/rust-lang/rust/pull/41714
-        self.borrow_refcount().load(Acquire);
-
-        unsafe {
-            self.drop_slow();
-        }
-    }
-}
-
-impl<T: ?Sized> Clone for Arc<T> {
-    #[inline]
-    fn clone(&self) -> Self {
-        // Using a relaxed ordering is alright here, as knowledge of the
-        // original reference prevents other threads from erroneously deleting
-        // the object.
-        //
-        // As explained in the [Boost documentation][1], Increasing the
-        // reference counter can always be done with memory_order_relaxed: New
-        // references to an object can only be formed from an existing
-        // reference, and passing an existing reference from one thread to
-        // another must already provide any required synchronization.
-        //
-        // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        let old_size = self.borrow_refcount().fetch_add(1, Relaxed);
-
-        // However we need to guard against massive refcounts in case someone
-        // is `mem::forget`ing Arcs. If we don't do this the count can overflow
-        // and users will use-after free. We racily saturate to `isize::MAX` on
-        // the assumption that there aren't ~2 billion threads incrementing
-        // the reference count at once. This branch will never be taken in
-        // any realistic program.
-        //
-        // We abort because such a program is incredibly degenerate, and we
-        // don't care to support it.
-        if old_size > MAX_REFCOUNT {
-            abort();
-        }
-
-        Arc {
-            ptr: self.ptr,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<T: ?Sized> Deref for Arc<T> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &T {
-        unsafe { &*self.ptr.as_ptr() }
-    }
-}
-
-impl<T: Clone> Arc<T> {
-    /// Makes a mutable reference to the `ArcHandle`, cloning if necessary
+    /// Makes a mutable reference to the `Arc`, cloning if necessary
     ///
     /// This is functionally equivalent to [`Arc::make_mut`][mm] from the standard library.
     ///
@@ -286,119 +134,69 @@ impl<T: Clone> Arc<T> {
     ///
     /// [mm]: https://doc.rust-lang.org/stable/std/sync/struct.Arc.html#method.make_mut
     #[inline]
-    pub fn make_mut(this: &mut Self) -> &mut T {
-        if !this.is_unique() {
-            // Another pointer exists; clone
-            *this = Arc::new((**this).clone());
-        }
-
+    pub fn make_mut(&mut self) -> &mut T
+    where
+        T: Clone,
+    {
         unsafe {
-            // This unsafety is ok because we're guaranteed that the pointer
-            // returned is the *only* pointer that will ever be returned to T. Our
-            // reference count is guaranteed to be 1 at this point, and we required
-            // the Arc itself to be `mut`, so we're returning the only possible
-            // reference to the inner data.
-            &mut *this.ptr.as_ptr()
+            // extract the Arc as an owned variable
+            let this = ptr::read(self);
+            // treat it as a real Arc
+            let mut arc = ArcHandle::from_arc(this);
+            // obtain the mutable reference. Cast away the lifetime
+            // This may mutate `arc`
+            let ret = ArcHandle::make_mut(&mut arc) as *mut _;
+            // Store the possibly-mutated arc back inside, after converting
+            // it to a Arc again
+            ptr::write(self, ArcHandle::into_arc(arc));
+            &mut *ret
         }
     }
-}
 
-impl<T: ?Sized + PartialEq> PartialEq for Arc<T> {
-    fn eq(&self, other: &Arc<T>) -> bool {
-        *(*self) == *(*other)
-    }
-
-    fn ne(&self, other: &Arc<T>) -> bool {
-        *(*self) != *(*other)
-    }
-}
-
-impl<T: ?Sized + PartialOrd> PartialOrd for Arc<T> {
-    fn partial_cmp(&self, other: &Arc<T>) -> Option<Ordering> {
-        (**self).partial_cmp(&**other)
-    }
-
-    fn lt(&self, other: &Arc<T>) -> bool {
-        *(*self) < *(*other)
-    }
-
-    fn le(&self, other: &Arc<T>) -> bool {
-        *(*self) <= *(*other)
-    }
-
-    fn gt(&self, other: &Arc<T>) -> bool {
-        *(*self) > *(*other)
-    }
-
-    fn ge(&self, other: &Arc<T>) -> bool {
-        *(*self) >= *(*other)
-    }
-}
-
-impl<T: ?Sized + Ord> Ord for Arc<T> {
-    fn cmp(&self, other: &Arc<T>) -> Ordering {
-        (**self).cmp(&**other)
-    }
-}
-
-impl<T: ?Sized + Eq> Eq for Arc<T> {}
-
-impl<T: ?Sized + fmt::Display> fmt::Display for Arc<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&**self, f)
-    }
-}
-
-impl<T: ?Sized + fmt::Debug> fmt::Debug for Arc<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&**self, f)
-    }
-}
-
-impl<T: ?Sized> fmt::Pointer for Arc<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Pointer::fmt(&Arc::as_ptr(self), f)
-    }
-}
-
-impl<T: Default> Default for Arc<T> {
+    /// Clone this `Arc` as an `ArcHandle`
     #[inline]
-    fn default() -> Arc<T> {
-        Arc::new(Default::default())
+    pub fn clone_handle(&self) -> ArcHandle<T> {
+        Arc::with_handle(self, |a| a.clone())
     }
-}
 
-impl<T: ?Sized + Hash> Hash for Arc<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        (**self).hash(state)
-    }
-}
-
-impl<T> From<T> for Arc<T> {
+    /// Produce a pointer to the data that can be converted back
+    /// to an `Arc<T>`. This is basically an `&Arc<T>`, without the extra indirection.
+    /// It has the benefits of an `&T` but also knows about the underlying refcount
+    /// and can be converted into more `Arc<T>`s if necessary.
     #[inline]
-    fn from(t: T) -> Self {
-        Arc::new(t)
+    pub fn borrow_arc<'a>(&'a self) -> ArcBorrow<'a, T> {
+        ArcBorrow(&**self)
+    }
+
+    /// Borrow this `Arc` as an `ArcBorrow`
+    #[inline]
+    pub fn as_borrow<'a>(&'a self) -> &'a ArcBorrow<'a, T> {
+        unsafe { std::mem::transmute(self) }
+    }
+
+    /// Get the reference count of this `Arc` with a given memory ordering
+    #[inline]
+    pub fn get_count(&self, ordering: Ordering) -> usize {
+        self.with_handle(|a| a.get_count(ordering))
     }
 }
 
-impl<T: ?Sized> borrow::Borrow<T> for Arc<T> {
-    #[inline]
+impl<'a, T> Borrow<T> for Arc<T> {
     fn borrow(&self) -> &T {
-        &**self
+        self.deref()
     }
 }
 
-impl<T: ?Sized> AsRef<T> for Arc<T> {
-    #[inline]
+impl<'a, T> AsRef<T> for Arc<T> {
     fn as_ref(&self) -> &T {
-        &**self
+        self.deref()
     }
 }
 
 #[cfg(feature = "stable_deref_trait")]
-unsafe impl<T: ?Sized> StableDeref for Arc<T> {}
+unsafe impl<T> StableDeref for Arc<T> {}
 #[cfg(feature = "stable_deref_trait")]
-unsafe impl<T: ?Sized> CloneStableDeref for Arc<T> {}
+unsafe impl<T> CloneStableDeref for Arc<T> {}
 
 #[cfg(feature = "serde")]
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Arc<T> {
@@ -411,40 +209,11 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Arc<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<T: ?Sized + Serialize> Serialize for Arc<T> {
+impl<T: Serialize> Serialize for Arc<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ::serde::ser::Serializer,
     {
         (**self).serialize(serializer)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn data_offset_sanity_tests() {
-        #[allow(dead_code)]
-        struct MyStruct {
-            id: usize,
-            name: String,
-            hash: u64,
-        };
-        let inner = ArcInner {
-            count: atomic::AtomicUsize::new(0),
-            data: MyStruct {
-                id: 596843,
-                name: "Jane".into(),
-                hash: 0xFF45345,
-            },
-        };
-        let data = &inner.data;
-        let data_ptr = data as *const _;
-        let data_addr = data_ptr as usize;
-        let inner_addr = &inner as *const _ as usize;
-        let (layout, data_offset) = ArcInner::data_offset(data);
-        assert_eq!(data_addr - inner_addr, data_offset);
-        assert_eq!(layout, Layout::for_value(&inner));
     }
 }
