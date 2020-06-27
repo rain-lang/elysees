@@ -59,26 +59,6 @@ impl<'a, T> ArcBorrow<'a, T> {
         }
     }
 
-    /// Borrow this as an `&T`.
-    #[inline]
-    pub fn as_double_ref(&self) -> &&'a T {
-        &self.0
-    }
-
-    /// Get this `ArcBorrow` as a pointer.
-    #[inline]
-    pub fn as_ptr(&self) -> *const T {
-        self.0
-    }
-
-    /// Borrow this `ArcBorrow` as a pointer
-    #[inline]
-    pub fn borrow_ptr(&self) -> &*const T {
-        unsafe {
-            std::mem::transmute(&self.0)
-        }
-    }
-
     /// For constructing from a reference known to be Arc-backed,
     /// e.g. if we obtain such a reference over FFI
     #[inline]
