@@ -27,20 +27,7 @@ extern crate serde;
 extern crate stable_deref_trait;
 
 mod arc;
-mod arc_borrow;
-mod arc_handle;
-mod arc_union;
-mod header;
-mod thin_arc;
-mod unique_arc;
-
 pub use arc::*;
-pub use arc_borrow::*;
-pub use arc_handle::*;
-pub use arc_union::*;
-pub use header::*;
-pub use thin_arc::*;
-pub use unique_arc::*;
 
 #[cfg(feature = "std")]
 use std::process::abort;
