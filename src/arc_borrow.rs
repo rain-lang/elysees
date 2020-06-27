@@ -1,3 +1,5 @@
+use core::borrow::Borrow;
+use core::convert::AsRef;
 use core::hash::Hash;
 use core::mem;
 use core::mem::ManuallyDrop;
@@ -54,9 +56,7 @@ impl<'a, T> ArcBorrow<'a, T> {
     /// Borrow this as an `Arc<T>`. This does *not* bump the refcount.
     #[inline]
     pub fn as_arc(&self) -> &Arc<T> {
-        unsafe {
-            std::mem::transmute(self)
-        }
+        unsafe { std::mem::transmute(self) }
     }
 
     /// For constructing from a reference known to be Arc-backed,
@@ -115,6 +115,47 @@ impl<'a, T> Deref for ArcBorrow<'a, T> {
         self.0
     }
 }
+
+impl<'a, T> Borrow<Arc<T>> for ArcBorrow<'a, T> {
+    fn borrow(&self) -> &Arc<T> {
+        self.as_arc()
+    }
+}
+
+impl<'a, T> Borrow<&'a T> for ArcBorrow<'a, T> {
+    fn borrow(&self) -> &&'a T {
+        unsafe {
+            std::mem::transmute(self)  
+        }
+    }
+}
+
+impl<'a, T> Borrow<T> for ArcBorrow<'a, T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<'a, T> AsRef<Arc<T>> for ArcBorrow<'a, T> {
+    fn as_ref(&self) -> &Arc<T> {
+        self.as_arc()
+    }
+}
+
+impl<'a, T> AsRef<&'a T> for ArcBorrow<'a, T> {
+    fn as_ref(&self) -> &&'a T {
+        unsafe {
+            std::mem::transmute(self)  
+        }
+    }
+}
+
+impl<'a, T> AsRef<T> for ArcBorrow<'a, T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+
 
 #[cfg(feature = "stable_deref_trait")]
 unsafe impl<'a, T> StableDeref for ArcBorrow<'a, T> {}

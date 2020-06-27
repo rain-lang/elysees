@@ -85,7 +85,7 @@ impl<T> ArcHandle<T> {
     /// Note: This raw pointer will be offset in the allocation and must be preceded
     /// by the atomic count.
     ///
-    /// It is recommended to use Arc for this
+    /// It is recommended to use `Arc` for this
     #[inline]
     pub unsafe fn from_raw(ptr: *const T) -> Self {
         // To find the corresponding pointer to the `ArcInner` we need

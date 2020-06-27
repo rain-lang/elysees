@@ -1,3 +1,5 @@
+use core::borrow::Borrow;
+use core::convert::AsRef;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
@@ -5,6 +7,7 @@ use core::mem::ManuallyDrop;
 use core::ops::Deref;
 use core::ptr;
 use core::sync::atomic::Ordering;
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
@@ -168,15 +171,25 @@ impl<T> Arc<T> {
     /// Borrow this `Arc` as an `ArcBorrow`
     #[inline]
     pub fn as_borrow<'a>(&'a self) -> &'a ArcBorrow<'a, T> {
-        unsafe {
-            std::mem::transmute(self)
-        }
+        unsafe { std::mem::transmute(self) }
     }
 
     /// Get the reference count of this `Arc` with a given memory ordering
     #[inline]
     pub fn get_count(&self, ordering: Ordering) -> usize {
         self.with_handle(|a| a.get_count(ordering))
+    }
+}
+
+impl<'a, T> Borrow<T> for Arc<T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<'a, T> AsRef<T> for Arc<T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
     }
 }
 
