@@ -12,6 +12,8 @@ use core::ptr;
 use core::sync::atomic;
 use core::sync::atomic::Ordering::{self as LoadOrdering, Acquire, Relaxed, Release};
 use core::{isize, usize};
+#[cfg(feature = "erasable")]
+use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
@@ -119,19 +121,15 @@ impl<T: ?Sized> Arc<T> {
     /// Borrow this `Arc<T>` as an `ArcBorrow<T>`
     #[inline]
     pub fn borrow_arc(&self) -> ArcBorrow<T> {
-        unsafe {
-            ArcBorrow::from_ref(self.deref())
-        }
+        unsafe { ArcBorrow::from_ref(self.deref()) }
     }
     /// Leak this `Arc<T>`, getting an `ArcBorrow<'static, T>`
-    /// 
-    /// You can call the `get` method on the returned `ArcBorrow` to get an `&'static T`. 
+    ///
+    /// You can call the `get` method on the returned `ArcBorrow` to get an `&'static T`.
     /// Note that using this can (obviously) cause memory leaks!
     #[inline]
     pub fn leak(this: Arc<T>) -> ArcBorrow<'static, T> {
-        let result = unsafe {
-            ArcBorrow::from_ref(&*this.ptr.as_ptr())
-        };
+        let result = unsafe { ArcBorrow::from_ref(&*this.ptr.as_ptr()) };
         mem::forget(this);
         result
     }
@@ -417,6 +415,18 @@ impl<T: ?Sized + Serialize> Serialize for Arc<T> {
         S: ::serde::ser::Serializer,
     {
         (**self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "erasable")]
+unsafe impl<T: ?Sized + Erasable> ErasablePtr for Arc<T> {
+    fn erase(this: Self) -> ErasedPtr {
+        let ptr = unsafe { ptr::NonNull::new_unchecked(Arc::into_raw(this) as *mut _) };
+        T::erase(ptr)
+    }
+
+    unsafe fn unerase(this: ErasedPtr) -> Self {
+        Self::from_raw(T::unerase(this).as_ptr())
     }
 }
 
