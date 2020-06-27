@@ -3,6 +3,8 @@ use core::convert::AsRef;
 use core::hash::Hash;
 use core::ops::Deref;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "erasable")]
+use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 #[cfg(feature = "stable_deref_trait")]
@@ -134,5 +136,15 @@ impl<'a, T: ?Sized + Serialize> Serialize for ArcBorrow<'a, T> {
         S: ::serde::ser::Serializer,
     {
         (**self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "erasable")]
+unsafe impl<'a, T: ?Sized + Erasable> ErasablePtr for ArcBorrow<'a, T> {
+    fn erase(this: Self) -> ErasedPtr {
+        T::erase(this.0.into())
+    }
+    unsafe fn unerase(this: ErasedPtr) -> Self {
+        ArcBorrow(&*T::unerase(this).as_ptr())
     }
 }
