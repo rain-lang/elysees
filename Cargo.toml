@@ -1,10 +1,10 @@
 [package]
 name = "elysees"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Jad Elkhaleq Ghalayini", "The Servo Project Developers"]
 license = "MIT/Apache-2.0"
 repository = "https://gitlab.com/rain-lang/elysees"
-description = "A fork of triomphe::Arc with some extra functionality. Currently just adds a getter for the refcount."
+description = "A fork of triomphe::Arc, now with more pointer tricks."
 keywords = ["arc", "ffi", "sync", "data-structure"]
 categories = ["concurrency", "data-structures"]
 
