@@ -11,9 +11,10 @@ edition = "2018"
 
 [features]
 std = []
-default = ["serde", "stable_deref_trait", "std", "erasable"]
+default = ["serde", "stable_deref_trait", "std", "erasable", "slice-dst"]
 
 [dependencies]
 serde = { version = "^1.0", default-features = false, optional = true }
 stable_deref_trait = { version = "^1.1", default-features = false, optional = true }
 erasable = { version = "^1.2", default-features = false, optional = true }
+slice-dst = { version = "^1.5", default-features = false, optional = true }
