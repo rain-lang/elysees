@@ -84,7 +84,7 @@ impl<T: Hash> Hash for Arc<T> {
 }
 
 impl<T> Arc<T> {
-    /// Temporarily converts |self| into a bonafide Arc and exposes it to the
+    /// Temporarily converts `|self|` into a bonafide `ArcHandle` and exposes it to the
     /// provided callback. The refcount is not modified.
     #[inline]
     pub fn with_handle<F, U>(&self, f: F) -> U
@@ -101,10 +101,19 @@ impl<T> Arc<T> {
         result
     }
 
-    /// If uniquely owned, provide a mutable reference
-    /// Else create a copy, and mutate that
+    /// Makes a mutable reference to the `Arc`, cloning if necessary
     ///
-    /// This is functionally the same thing as `Arc::make_mut`
+    /// This is functionally equivalent to [`Arc::make_mut`][mm] from the standard library.
+    ///
+    /// If this `ArcHandle` is uniquely owned, `make_mut()` will provide a mutable
+    /// reference to the contents. If not, `make_mut()` will create a _new_ `ArcHandle`
+    /// with a copy of the contents, update `this` to point to it, and provide
+    /// a mutable reference to its contents.
+    ///
+    /// This is useful for implementing copy-on-write schemes where you wish to
+    /// avoid copying things if your `Arc` is not shared.
+    ///
+    /// [mm]: https://doc.rust-lang.org/stable/std/sync/struct.Arc.html#method.make_mut
     #[inline]
     pub fn make_mut(&mut self) -> &mut T
     where
@@ -125,14 +134,16 @@ impl<T> Arc<T> {
         }
     }
 
-    /// Clone it as an `ArcHandle`
+    /// Clone this `Arc` as an `ArcHandle`
     #[inline]
     pub fn clone_handle(&self) -> ArcHandle<T> {
         Arc::with_handle(self, |a| a.clone())
     }
 
     /// Produce a pointer to the data that can be converted back
-    /// to an `Arc`
+    /// to an `Arc<T>`. This is basically an `&Arc<T>`, without the extra indirection.
+    /// It has the benefits of an `&T` but also knows about the underlying refcount
+    /// and can be converted into more `Arc<T>`s if necessary.
     #[inline]
     pub fn borrow_arc<'a>(&'a self) -> ArcBorrow<'a, T> {
         ArcBorrow(&**self)
