@@ -1,3 +1,4 @@
+use crate::abort;
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::marker::PhantomData;
 use core::mem;
@@ -18,16 +19,16 @@ pub struct ArcInner<T: ?Sized> {
 }
 
 impl<T: ?Sized> ArcInner<T> {
-    /// Get the theoretical offset of a piece of data in an `ArcInner`
-    pub fn data_offset(data: &T) -> usize {
-        let count_size = std::mem::size_of::<atomic::AtomicUsize>();
-        let data_alignment = std::mem::align_of_val(data);
-        let data_offset = ((count_size + data_alignment - 1) / data_alignment) * data_alignment;
-        data_offset
+    /// Get the theoretical offset of a piece of data in an `ArcInner`, as well as the layout of that `ArcInner`
+    pub fn data_offset(data: &T) -> (Layout, usize) {
+        let atomic_layout = Layout::new::<atomic::AtomicUsize>();
+        atomic_layout
+            .extend(Layout::for_value(data))
+            .unwrap_or_else(|_| abort())
     }
     /// Get a reference to the reference count from a data pointer
     pub(crate) unsafe fn refcount_ptr<'a>(ptr: *const T) -> &'a atomic::AtomicUsize {
-        let data_offset = ArcInner::data_offset(&*ptr);
+        let (_layout, data_offset) = ArcInner::data_offset(&*ptr);
         let count_ptr = (ptr as *const u8).sub(data_offset) as *const atomic::AtomicUsize;
         &(*count_ptr)
     }
@@ -122,23 +123,22 @@ mod tests {
         struct MyStruct {
             id: usize,
             name: String,
-            hash: u64
+            hash: u64,
         };
         let inner = ArcInner {
             count: atomic::AtomicUsize::new(0),
             data: MyStruct {
                 id: 596843,
                 name: "Jane".into(),
-                hash: 0xFF45345
-            }
+                hash: 0xFF45345,
+            },
         };
         let data = &inner.data;
         let data_ptr = data as *const _;
         let data_addr = data_ptr as usize;
         let inner_addr = &inner as *const _ as usize;
-        assert_eq!(
-            data_addr - inner_addr,
-            ArcInner::data_offset(data)
-        )
+        let (layout, data_offset) = ArcInner::data_offset(data);
+        assert_eq!(data_addr - inner_addr, data_offset);
+        assert_eq!(layout, Layout::for_value(&inner));
     }
 }
