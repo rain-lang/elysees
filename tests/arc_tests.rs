@@ -144,6 +144,11 @@ fn basic_arc_usage() {
     assert_eq!(leak_ptr_borrow.as_ptr() as *const _, &*yl as *const _);
     assert_eq!(unique_ptr_borrow.as_ptr() as *const _, &*remake_unique as *const _);
 
+    let leak_ref_borrow: &&_ = yl.borrow();
+    assert_eq!(*leak_ref_borrow, yl.get());
+    let leak_ref_borrow: &&_ = yl.as_ref();
+    assert_eq!(*leak_ref_borrow, yl.get());
+
     let yba: &Arc<_> = yl.borrow();
     let yaa: &Arc<_> = yl.as_ref();
     assert_eq!(yba, yaa);
