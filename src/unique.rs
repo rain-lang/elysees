@@ -10,6 +10,8 @@ use erasable::{Erasable, ErasablePtr, ErasedPtr};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::StableDeref;
+#[cfg(feature = "slice-dst")]
+use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 
 use super::Arc;
 
@@ -187,5 +189,24 @@ unsafe impl<T: ?Sized + Erasable> ErasablePtr for ArcBox<T> {
 
     unsafe fn unerase(this: ErasedPtr) -> Self {
         ArcBox(ErasablePtr::unerase(this))
+    }
+}
+
+#[cfg(feature = "slice-dst")]
+unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for ArcBox<S> {
+    unsafe fn try_new_slice_dst<I, E>(len: usize, init: I) -> Result<Self, E>
+    where
+        I: FnOnce(ptr::NonNull<S>) -> Result<(), E>,
+    {
+        Arc::try_new_slice_dst(len, init).map(ArcBox)
+    }
+}
+
+unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for ArcBox<S> {
+    unsafe fn new_slice_dst<I>(len: usize, init: I) -> Self
+    where
+        I: FnOnce(ptr::NonNull<S>),
+    {
+        ArcBox(Arc::new_slice_dst(len, init))
     }
 }
