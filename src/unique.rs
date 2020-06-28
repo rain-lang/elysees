@@ -54,7 +54,7 @@ use super::Arc;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct ArcBox<T: ?Sized>(Arc<T>);
+pub struct ArcBox<T: ?Sized>(pub(crate) Arc<T>);
 
 impl<T> ArcBox<T> {
     /// Construct a new ArcBox
