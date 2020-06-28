@@ -1,7 +1,9 @@
 use core::borrow::Borrow;
 use core::convert::AsRef;
 use core::hash::Hash;
+use core::mem;
 use core::ops::Deref;
+use core::ptr;
 use core::sync::atomic::Ordering;
 #[cfg(feature = "erasable")]
 use erasable::{Erasable, ErasablePtr, ErasedPtr};
@@ -121,6 +123,49 @@ impl<'a, T: ?Sized> AsRef<&'a T> for ArcBorrow<'a, T> {
 impl<'a, T: ?Sized> AsRef<T> for ArcBorrow<'a, T> {
     fn as_ref(&self) -> &T {
         self.deref()
+    }
+}
+
+
+impl<'a, T: ?Sized> Borrow<*const T> for ArcBorrow<'a, T> {
+    #[inline]
+    fn borrow(&self) -> &*const T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<'a, T: ?Sized> AsRef<*const T> for ArcBorrow<'a, T> {
+    #[inline]
+    fn as_ref(&self) -> &*const T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<'a, T: ?Sized> Borrow<*mut T> for ArcBorrow<'a, T> {
+    #[inline]
+    fn borrow(&self) -> &*mut T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<'a, T: ?Sized> AsRef<*mut T> for ArcBorrow<'a, T> {
+    #[inline]
+    fn as_ref(&self) -> &*mut T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<'a, T: ?Sized> Borrow<ptr::NonNull<T>> for ArcBorrow<'a, T> {
+    #[inline]
+    fn borrow(&self) -> &ptr::NonNull<T> {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<'a, T: ?Sized> AsRef<ptr::NonNull<T>> for ArcBorrow<'a, T> {
+    #[inline]
+    fn as_ref(&self) -> &ptr::NonNull<T> {
+        unsafe { mem::transmute(self) }
     }
 }
 

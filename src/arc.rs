@@ -1,6 +1,6 @@
 use crate::{abort, ArcBorrow};
 use alloc::alloc::{alloc, dealloc, Layout};
-use core::borrow;
+use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::convert::From;
 use core::fmt;
@@ -381,7 +381,7 @@ impl<T> From<T> for Arc<T> {
     }
 }
 
-impl<T: ?Sized> borrow::Borrow<T> for Arc<T> {
+impl<T: ?Sized> Borrow<T> for Arc<T> {
     #[inline]
     fn borrow(&self) -> &T {
         &**self
@@ -394,6 +394,49 @@ impl<T: ?Sized> AsRef<T> for Arc<T> {
         &**self
     }
 }
+
+impl<T: ?Sized> Borrow<*const T> for Arc<T> {
+    #[inline]
+    fn borrow(&self) -> &*const T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> AsRef<*const T> for Arc<T> {
+    #[inline]
+    fn as_ref(&self) -> &*const T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> Borrow<*mut T> for Arc<T> {
+    #[inline]
+    fn borrow(&self) -> &*mut T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> AsRef<*mut T> for Arc<T> {
+    #[inline]
+    fn as_ref(&self) -> &*mut T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> Borrow<ptr::NonNull<T>> for Arc<T> {
+    #[inline]
+    fn borrow(&self) -> &ptr::NonNull<T> {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> AsRef<ptr::NonNull<T>> for Arc<T> {
+    #[inline]
+    fn as_ref(&self) -> &ptr::NonNull<T> {
+        unsafe { mem::transmute(self) }
+    }
+}
+
 
 #[cfg(feature = "stable_deref_trait")]
 unsafe impl<T: ?Sized> StableDeref for Arc<T> {}
@@ -442,9 +485,7 @@ unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
 
         impl Drop for RawAlloc {
             fn drop(&mut self) {
-                unsafe {
-                    dealloc(self.0, self.1)
-                }
+                unsafe { dealloc(self.0, self.1) }
             }
         }
 
@@ -454,13 +495,14 @@ unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
         let (inner_layout, slice_offset) = count_layout
             .extend(slice_layout)
             .expect("Integer overflow computing slice layout");
-        
         // Allocate
         let inner_alloc = alloc(inner_layout);
         let drop_guard = RawAlloc(inner_alloc, inner_layout);
-        
         // Write counter
-        ptr::write(inner_alloc as *mut atomic::AtomicUsize, atomic::AtomicUsize::new(0));
+        ptr::write(
+            inner_alloc as *mut atomic::AtomicUsize,
+            atomic::AtomicUsize::new(0),
+        );
 
         // Get slice pointer
         let slice_addr = inner_alloc.add(slice_offset) as *mut ();
@@ -476,7 +518,7 @@ unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
         mem::forget(drop_guard);
         Ok(Arc {
             ptr,
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 }
