@@ -20,6 +20,7 @@ lazy_static! {
 
 #[test]
 fn basic_arc_usage() {
+    #![allow(clippy::many_single_char_names)]
     let x = Arc::new(7);
     assert!(x.is_unique());
     assert_eq!(*x, 7);
