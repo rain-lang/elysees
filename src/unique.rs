@@ -8,10 +8,10 @@ use core::ptr;
 use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "stable_deref_trait")]
-use stable_deref_trait::StableDeref;
 #[cfg(feature = "slice-dst")]
 use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
+#[cfg(feature = "stable_deref_trait")]
+use stable_deref_trait::StableDeref;
 
 use super::Arc;
 
@@ -61,6 +61,13 @@ impl<T> ArcBox<T> {
     #[inline]
     pub fn new(data: T) -> Self {
         ArcBox(Arc::new(data))
+    }
+}
+
+impl<T: Clone> Clone for ArcBox<T> {
+    #[inline]
+    fn clone(&self) -> ArcBox<T> {
+        ArcBox(Arc::new(self.0.deref().clone()))
     }
 }
 
