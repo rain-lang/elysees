@@ -1,4 +1,4 @@
-use crate::{abort, ArcBorrow};
+use crate::{abort, ArcBorrow, ArcBox};
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::borrow::Borrow;
 use core::cmp::Ordering;
@@ -182,6 +182,15 @@ impl<T: ?Sized> Arc<T> {
         // [1] https://github.com/servo/servo/issues/21186
         Arc::count(self, Acquire) == 1
     }
+    /// Try to convert this `Arc` to an `ArcBox` if it is unique
+    #[inline]
+    pub fn try_unique(self) -> Result<ArcBox<T>, Arc<T>> {
+        if self.is_unique() {
+            Ok(ArcBox(self))
+        } else {
+            Err(self)
+        }
+    }
     /// Get the reference count of this `Arc` with a given ordering
     #[inline]
     pub fn count(this: &Arc<T>, ordering: LoadOrdering) -> usize {
@@ -299,6 +308,15 @@ impl<T: Clone> Arc<T> {
             // the Arc itself to be `mut`, so we're returning the only possible
             // reference to the inner data.
             &mut *this.ptr.as_ptr()
+        }
+    }
+    /// Convert this `Arc` to an `ArcBox`, cloning the internal data if necessary for uniqueness
+    #[inline]
+    pub fn unique(self) -> ArcBox<T> {
+        if self.is_unique() {
+            ArcBox(self)
+        } else {
+            ArcBox::new(self.deref().clone())
         }
     }
 }
@@ -436,7 +454,6 @@ impl<T: ?Sized> AsRef<ptr::NonNull<T>> for Arc<T> {
         unsafe { mem::transmute(self) }
     }
 }
-
 
 #[cfg(feature = "stable_deref_trait")]
 unsafe impl<T: ?Sized> StableDeref for Arc<T> {}
