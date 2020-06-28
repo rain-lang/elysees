@@ -1,8 +1,9 @@
 use elysees::*;
 use erasable::Thin;
-use slice_dst::SliceWithHeader;
+use slice_dst::{TryAllocSliceDst, SliceWithHeader};
 use std::borrow::BorrowMut;
 use std::iter::FromIterator;
+use std::ptr::NonNull;
 
 #[test]
 fn basic_dst_test() {
@@ -87,4 +88,15 @@ fn dst_union_test() {
     assert!(union4.c().is_some());
     union4 = UnionAlign::d(d);
     assert!(union4.d().is_some());
+}
+
+#[test]
+fn failed_dst_alloc() {
+    fn fallible_alloc(_: NonNull<SliceWithHeader<&str, u8>>) -> Result<(), &str> {
+        Err("Bad!")
+    }
+    unsafe {
+        assert_eq!(Arc::try_new_slice_dst(57, fallible_alloc), Err("Bad!"));
+        assert_eq!(ArcBox::try_new_slice_dst(57, fallible_alloc), Err("Bad!"));
+    }
 }

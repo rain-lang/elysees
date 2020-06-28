@@ -165,6 +165,13 @@ impl<T: ?Sized> AsRef<ptr::NonNull<T>> for ArcBox<T> {
     }
 }
 
+impl<T: Default> Default for ArcBox<T> {
+    #[inline]
+    fn default() -> ArcBox<T> {
+        ArcBox::new(Default::default())
+    }
+}
+
 #[cfg(feature = "stable_deref_trait")]
 unsafe impl<T: ?Sized> StableDeref for ArcBox<T> {}
 

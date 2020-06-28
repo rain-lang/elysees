@@ -181,3 +181,12 @@ fn arc_formatting() {
     assert_eq!(format!("{:p}", arc1), format!("{:?}", &*arc1 as *const _));
     assert_eq!(format!("{:p}", arc2), format!("{:?}", &*arc2 as *const _));
 }
+
+#[test]
+fn arc_default() {
+    let arc: Arc<usize> = Arc::default();
+    assert_eq!(*arc, 0);
+    assert!(arc.is_unique());
+    let unique_arc: ArcBox<usize> = ArcBox::default();
+    assert_eq!(*unique_arc, 0);
+}
