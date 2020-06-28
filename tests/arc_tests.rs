@@ -107,7 +107,9 @@ fn basic_arc_usage() {
     assert_eq!(*unique_ptr_borrow, remake_unique.borrow() as *const _);
     assert_eq!(*ptr_borrow, not_unique.as_ref() as *const _);
     assert_eq!(*leak_ptr_borrow, yl.as_ref() as *const _);
+    assert_eq!(*leak_ptr_borrow, yl.get() as *const _);
     assert_eq!(*unique_ptr_borrow, remake_unique.as_ref() as *const _);
+
     let ptr_borrow: &*const usize = not_unique.as_ref();
     let leak_ptr_borrow: &*const usize = yl.as_ref();
     assert_eq!(*ptr_borrow, &*not_unique as *const _);
@@ -120,6 +122,7 @@ fn basic_arc_usage() {
     assert_eq!(*ptr_borrow as *const _, &*not_unique as *const _);
     assert_eq!(*leak_ptr_borrow as *const _, &*yl as *const _);
     assert_eq!(*unique_ptr_borrow as *const _, &*remake_unique as *const _);
+
     let ptr_borrow: &*mut usize = not_unique.as_ref();
     let leak_ptr_borrow: &*mut usize = yl.as_ref();
     let unique_ptr_borrow: &*mut usize = remake_unique.as_ref();
@@ -140,6 +143,12 @@ fn basic_arc_usage() {
     assert_eq!(ptr_borrow.as_ptr() as *const _, &*not_unique as *const _);
     assert_eq!(leak_ptr_borrow.as_ptr() as *const _, &*yl as *const _);
     assert_eq!(unique_ptr_borrow.as_ptr() as *const _, &*remake_unique as *const _);
+
+    let yba: &Arc<_> = yl.borrow();
+    let yaa: &Arc<_> = yl.as_ref();
+    assert_eq!(yba, yaa);
+    assert!(ArcBorrow::ptr_eq(yba.borrow_arc(), yaa.borrow_arc()));
+    assert!(ArcBorrow::ptr_eq(yba.borrow_arc(), yl))
 }
 
 #[test]

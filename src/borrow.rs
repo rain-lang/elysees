@@ -64,7 +64,7 @@ impl<'a, T: ?Sized> ArcBorrow<'a, T> {
     /// Compare two `ArcBorrow`s via pointer equality. Will only return
     /// true if they come from the same allocation
     #[inline]
-    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+    pub fn ptr_eq(this: Self, other: Self) -> bool {
         this.0 as *const T == other.0 as *const T
     }
 

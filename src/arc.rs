@@ -196,6 +196,12 @@ impl<T: ?Sized> Arc<T> {
     pub fn count(this: &Arc<T>, ordering: LoadOrdering) -> usize {
         this.borrow_refcount().load(ordering)
     }
+    /// Compare two `Arc`s via pointer equality. Will only return
+    /// true if they come from the same allocation
+    #[inline]
+    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        this.ptr == other.ptr
+    }
 }
 
 impl<T: ?Sized> Drop for Arc<T> {
