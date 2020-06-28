@@ -39,9 +39,11 @@ impl<T: ?Sized> ArcInner<T> {
     #[inline]
     pub fn data_offset(data: &T) -> (Layout, usize) {
         let atomic_layout = Layout::new::<atomic::AtomicUsize>();
-        atomic_layout
+        let (layout, offset) = atomic_layout
             .extend(Layout::for_value(data))
-            .unwrap_or_else(|_| abort())
+            .unwrap_or_else(|_| abort());
+        let layout = layout.pad_to_align();
+        (layout, offset)
     }
     /// Get an untyped pointer to the inner data from a data pointer, along with a layout
     #[inline]
