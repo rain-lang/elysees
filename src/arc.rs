@@ -45,19 +45,20 @@ impl<T: ?Sized> ArcInner<T> {
     }
     /// Get an untyped pointer to the inner data from a data pointer, along with a layout
     #[inline]
-    pub(crate) unsafe fn inner_ptr<'a>(ptr: *const T) -> (Layout, *const u8) {
+    pub(crate) unsafe fn inner_ptr(ptr: *const T) -> (Layout, *const u8) {
         let (layout, data_offset) = ArcInner::data_offset(&*ptr);
         (layout, (ptr as *const u8).sub(data_offset))
     }
     /// Get an untyped mutable pointer to the inner data from a data pointer, along with a layout
     #[inline]
-    pub(crate) unsafe fn inner_ptr_mut<'a>(ptr: *mut T) -> (Layout, *mut u8) {
+    pub(crate) unsafe fn inner_ptr_mut(ptr: *mut T) -> (Layout, *mut u8) {
         let (layout, data_offset) = ArcInner::data_offset(&*ptr);
         (layout, (ptr as *mut u8).sub(data_offset))
     }
     /// Get a reference to the reference count from a data pointer
     #[inline]
     pub(crate) unsafe fn refcount_ptr<'a>(ptr: *const T) -> &'a atomic::AtomicUsize {
+        #[allow(clippy::cast_ptr_alignment)]
         &*(ArcInner::inner_ptr(ptr).1 as *const atomic::AtomicUsize)
     }
 }
@@ -153,6 +154,10 @@ impl<T: ?Sized> Arc<T> {
     ///
     /// Note: This raw pointer will be offset in the allocation and must be preceded
     /// by the atomic count.
+    /// 
+    /// # Safety
+    /// This function must be called with a pointer obtained from `into_raw()`, which
+    /// is then invalidated.
     #[inline]
     pub unsafe fn from_raw(ptr: *const T) -> Arc<T> {
         Arc {
@@ -331,7 +336,7 @@ impl<T: ?Sized + PartialEq> PartialEq for Arc<T> {
     fn eq(&self, other: &Arc<T>) -> bool {
         *(*self) == *(*other)
     }
-
+    #[allow(clippy::partialeq_ne_impl)]
     fn ne(&self, other: &Arc<T>) -> bool {
         *(*self) != *(*other)
     }
@@ -422,42 +427,42 @@ impl<T: ?Sized> AsRef<T> for Arc<T> {
 impl<T: ?Sized> Borrow<*const T> for Arc<T> {
     #[inline]
     fn borrow(&self) -> &*const T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const Arc<T> as *const *const T) }
     }
 }
 
 impl<T: ?Sized> AsRef<*const T> for Arc<T> {
     #[inline]
     fn as_ref(&self) -> &*const T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const Arc<T> as *const *const T) }
     }
 }
 
 impl<T: ?Sized> Borrow<*mut T> for Arc<T> {
     #[inline]
     fn borrow(&self) -> &*mut T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const Arc<T> as *const *mut T) }
     }
 }
 
 impl<T: ?Sized> AsRef<*mut T> for Arc<T> {
     #[inline]
     fn as_ref(&self) -> &*mut T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const Arc<T> as *const *mut T) }
     }
 }
 
 impl<T: ?Sized> Borrow<ptr::NonNull<T>> for Arc<T> {
     #[inline]
     fn borrow(&self) -> &ptr::NonNull<T> {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const Arc<T> as *const ptr::NonNull<T>) }
     }
 }
 
 impl<T: ?Sized> AsRef<ptr::NonNull<T>> for Arc<T> {
     #[inline]
     fn as_ref(&self) -> &ptr::NonNull<T> {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const Arc<T> as *const ptr::NonNull<T>) }
     }
 }
 
@@ -521,11 +526,14 @@ unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
         // Allocate
         let inner_alloc = alloc(inner_layout);
         let drop_guard = RawAlloc(inner_alloc, inner_layout);
-        // Write counter
-        ptr::write(
-            inner_alloc as *mut atomic::AtomicUsize,
-            atomic::AtomicUsize::new(1),
-        );
+        {
+            #[allow(clippy::cast_ptr_alignment)]
+            // Write counter
+            ptr::write(
+                inner_alloc as *mut atomic::AtomicUsize,
+                atomic::AtomicUsize::new(1),
+            );
+        }
 
         // Get slice pointer
         let slice_addr = inner_alloc.add(slice_offset) as *mut ();

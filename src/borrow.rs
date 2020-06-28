@@ -1,7 +1,6 @@
 use core::borrow::Borrow;
 use core::convert::AsRef;
 use core::hash::Hash;
-use core::mem;
 use core::ops::Deref;
 use core::ptr;
 use core::sync::atomic::Ordering;
@@ -51,11 +50,17 @@ impl<'a, T: ?Sized> ArcBorrow<'a, T> {
     /// Borrow this as an `Arc<T>`. This does *not* bump the refcount.
     #[inline]
     pub fn as_arc(&self) -> &Arc<T> {
-        unsafe { std::mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const Arc<T>) }
     }
 
     /// For constructing from a reference known to be Arc-backed,
     /// e.g. if we obtain such a reference over FFI
+    /// 
+    /// # Safety
+    /// The reference passed in must be to a `T` within a valid `ArcInner`. Valid
+    /// examples include the result of `ArcBorrow::get`, `Arc::deref`, etc. The reference
+    /// passed in may *not* be from a `T` owned by an `ArcBox`, as this violates the
+    /// `ArcBox`'s uniqueness guarantees.
     #[inline]
     pub unsafe fn from_ref(r: &'a T) -> Self {
         ArcBorrow(r)
@@ -98,7 +103,7 @@ impl<'a, T: ?Sized> Borrow<Arc<T>> for ArcBorrow<'a, T> {
 
 impl<'a, T: ?Sized> Borrow<&'a T> for ArcBorrow<'a, T> {
     fn borrow(&self) -> &&'a T {
-        unsafe { std::mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const &T) }
     }
 }
 
@@ -116,7 +121,7 @@ impl<'a, T: ?Sized> AsRef<Arc<T>> for ArcBorrow<'a, T> {
 
 impl<'a, T: ?Sized> AsRef<&'a T> for ArcBorrow<'a, T> {
     fn as_ref(&self) -> &&'a T {
-        unsafe { std::mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const &T) }
     }
 }
 
@@ -130,42 +135,42 @@ impl<'a, T: ?Sized> AsRef<T> for ArcBorrow<'a, T> {
 impl<'a, T: ?Sized> Borrow<*const T> for ArcBorrow<'a, T> {
     #[inline]
     fn borrow(&self) -> &*const T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const *const T) }
     }
 }
 
 impl<'a, T: ?Sized> AsRef<*const T> for ArcBorrow<'a, T> {
     #[inline]
     fn as_ref(&self) -> &*const T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const *const T) }
     }
 }
 
 impl<'a, T: ?Sized> Borrow<*mut T> for ArcBorrow<'a, T> {
     #[inline]
     fn borrow(&self) -> &*mut T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const *mut T) }
     }
 }
 
 impl<'a, T: ?Sized> AsRef<*mut T> for ArcBorrow<'a, T> {
     #[inline]
     fn as_ref(&self) -> &*mut T {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const *mut T) }
     }
 }
 
 impl<'a, T: ?Sized> Borrow<ptr::NonNull<T>> for ArcBorrow<'a, T> {
     #[inline]
     fn borrow(&self) -> &ptr::NonNull<T> {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const ptr::NonNull<T>) }
     }
 }
 
 impl<'a, T: ?Sized> AsRef<ptr::NonNull<T>> for ArcBorrow<'a, T> {
     #[inline]
     fn as_ref(&self) -> &ptr::NonNull<T> {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const ArcBorrow<T> as *const ptr::NonNull<T>) }
     }
 }
 

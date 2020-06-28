@@ -32,7 +32,7 @@ fn basic_arc_usage() {
     let yb = y.borrow_arc();
     assert_eq!(*yb, 80);
     assert_eq!(ArcBorrow::count(yb, Relaxed), 1);
-    let yb2 = yb.clone();
+    let yb2 = yb;
     assert_eq!(ArcBorrow::count(yb, Relaxed), 1);
     assert_eq!(ArcBorrow::count(yb2, Relaxed), 1);
     let ybr = yb2.as_arc();
@@ -102,6 +102,7 @@ fn basic_arc_usage() {
     let box_unique = box_unique.shareable();
     let not_unique = box_unique.clone();
     let not_unique = Arc::try_unique(not_unique).expect_err("Not unique!");
+    assert!(box_unique.is_unique());
 
     let ptr_borrow: &*const usize = not_unique.borrow();
     let leak_ptr_borrow: &*const usize = yl.borrow();
