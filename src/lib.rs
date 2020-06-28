@@ -14,7 +14,7 @@
 //! [![Pipeline status](https://gitlab.com/rain-lang/elysees/badges/master/pipeline.svg)](https://gitlab.com/rain-lang/elysees)
 //! [![codecov](https://codecov.io/gl/rain-lang/elysees/branch/master/graph/badge.svg)](https://codecov.io/gl/rain-lang/elysees)
 //! [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-//! 
+//!
 //! Fork of Arc, now with more pointer tricks.
 
 #![allow(missing_docs)]

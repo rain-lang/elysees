@@ -156,7 +156,7 @@ impl<T: ?Sized> Arc<T> {
     ///
     /// Note: This raw pointer will be offset in the allocation and must be preceded
     /// by the atomic count.
-    /// 
+    ///
     /// # Safety
     /// This function must be called with a pointer obtained from `into_raw()`, which
     /// is then invalidated.

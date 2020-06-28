@@ -1,6 +1,6 @@
 use elysees::*;
 use erasable::Thin;
-use slice_dst::{TryAllocSliceDst, SliceWithHeader};
+use slice_dst::{SliceWithHeader, TryAllocSliceDst};
 use std::borrow::BorrowMut;
 use std::iter::FromIterator;
 use std::ptr::NonNull;
