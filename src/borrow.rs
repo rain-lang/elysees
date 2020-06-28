@@ -1,6 +1,7 @@
 use core::borrow::Borrow;
 use core::convert::AsRef;
 use core::hash::Hash;
+use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr;
 use core::sync::atomic::Ordering;
@@ -30,7 +31,10 @@ use super::Arc;
 /// without needing to worry about where the `Arc<T>` is.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct ArcBorrow<'a, T: ?Sized + 'a>(pub(crate) &'a T);
+pub struct ArcBorrow<'a, T: ?Sized + 'a> {
+    ptr: ptr::NonNull<T>,
+    phantom: PhantomData<&'a T>,
+}
 
 impl<'a, T: ?Sized> Copy for ArcBorrow<'a, T> {}
 impl<'a, T: ?Sized> Clone for ArcBorrow<'a, T> {
@@ -53,31 +57,37 @@ impl<'a, T: ?Sized> ArcBorrow<'a, T> {
         unsafe { &*(self as *const ArcBorrow<T> as *const Arc<T>) }
     }
 
-    /// For constructing from a reference known to be Arc-backed,
-    /// e.g. if we obtain such a reference over FFI
-    /// 
+    /// For constructing from a pointer known to be Arc-backed,
+    /// e.g. if we obtain such a pointer over FFI
+    ///
     /// # Safety
-    /// The reference passed in must be to a `T` within a valid `ArcInner`. Valid
-    /// examples include the result of `ArcBorrow::get`, `Arc::deref`, etc. The reference
-    /// passed in may *not* be from a `T` owned by an `ArcBox`, as this violates the
-    /// `ArcBox`'s uniqueness guarantees.
+    /// This pointer shouild come from `Arc::into_raw`: this, however, will *not* consume it!
     #[inline]
-    pub unsafe fn from_ref(r: &'a T) -> Self {
-        ArcBorrow(r)
+    pub unsafe fn from_raw(ptr: *const T) -> Self {
+        ArcBorrow {
+            ptr: ptr::NonNull::new_unchecked(ptr as *mut T),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Get the internal pointer of an `ArcBorrow`
+    #[inline]
+    pub fn into_raw(this: Self) -> *const T {
+        this.ptr.as_ptr()
     }
 
     /// Compare two `ArcBorrow`s via pointer equality. Will only return
     /// true if they come from the same allocation
     #[inline]
     pub fn ptr_eq(this: Self, other: Self) -> bool {
-        this.0 as *const T == other.0 as *const T
+        this.ptr == other.ptr
     }
 
     /// Similar to deref, but uses the lifetime |a| rather than the lifetime of
     /// self, which is incompatible with the signature of the Deref trait.
     #[inline]
     pub fn get(&self) -> &'a T {
-        self.0
+        unsafe { &*self.ptr.as_ptr() }
     }
 
     /// Get the reference count of this `Arc` with a given memory ordering
@@ -91,7 +101,7 @@ impl<'a, T: ?Sized> Deref for ArcBorrow<'a, T> {
 
     #[inline]
     fn deref(&self) -> &T {
-        self.0
+        self.get()
     }
 }
 
@@ -130,7 +140,6 @@ impl<'a, T: ?Sized> AsRef<T> for ArcBorrow<'a, T> {
         self.deref()
     }
 }
-
 
 impl<'a, T: ?Sized> Borrow<*const T> for ArcBorrow<'a, T> {
     #[inline]
@@ -192,9 +201,12 @@ impl<'a, T: ?Sized + Serialize> Serialize for ArcBorrow<'a, T> {
 #[cfg(feature = "erasable")]
 unsafe impl<'a, T: ?Sized + Erasable> ErasablePtr for ArcBorrow<'a, T> {
     fn erase(this: Self) -> ErasedPtr {
-        T::erase(this.0.into())
+        T::erase(this.ptr)
     }
     unsafe fn unerase(this: ErasedPtr) -> Self {
-        ArcBorrow(&*T::unerase(this).as_ptr())
+        ArcBorrow {
+            ptr: T::unerase(this),
+            phantom: PhantomData,
+        }
     }
 }

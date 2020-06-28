@@ -1,9 +1,22 @@
 use elysees::*;
+use lazy_static::lazy_static;
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Mutex;
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+struct SyncPtr(*const ());
+
+unsafe impl Send for SyncPtr {}
+unsafe impl Sync for SyncPtr {}
+
+lazy_static! {
+    /// Set of roots for MIRI to treat as always reachable, to avoid memory leak errors
+    static ref ROOTS: Mutex<HashSet<SyncPtr>> = Mutex::new(HashSet::new());
+}
 
 #[test]
 fn basic_arc_usage() {
@@ -170,6 +183,12 @@ fn basic_arc_usage() {
     assert_eq!(yba, yaa);
     assert!(ArcBorrow::ptr_eq(yba.borrow_arc(), yaa.borrow_arc()));
     assert!(ArcBorrow::ptr_eq(yba.borrow_arc(), yl));
+
+    // Avoid memory leaK error for yl
+    ROOTS
+        .lock()
+        .unwrap()
+        .insert(SyncPtr(ArcBorrow::into_raw(yl) as *const ()));
 }
 
 #[test]
