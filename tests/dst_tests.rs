@@ -51,7 +51,6 @@ fn unique_dst_test() {
     let arc = arc.shareable();
     assert_eq!(arc.header, "unique");
     assert_eq!(arc.slice, [99, 1, 2, 77, 88]);
-    
     let arc = Arc::try_unique(arc).expect("Is unique!");
     assert_eq!(arc.header, "unique");
     assert_eq!(arc.slice, [99, 1, 2, 77, 88]);
@@ -61,4 +60,31 @@ fn unique_dst_test() {
     assert_eq!(arc.slice, [99, 1, 2, 77, 88]);
     let _arc2 = arc.clone();
     Arc::try_unique(arc).expect_err("Not unique!");
+}
+
+#[test]
+fn dst_union_test() {
+    let a: Arc<_> = SliceWithHeader::new("a", 0..10);
+    let b: ArcBox<_> = SliceWithHeader::new("b", 10..20);
+    let c: Arc<_> = SliceWithHeader::new("c", 20..30);
+    let d_o: Arc<_> = SliceWithHeader::new("d", 30..40);
+    let d = d_o.borrow_arc();
+
+    let mut union2 = UnionAlign::left(a.clone());
+    assert!(union2.a().is_some());
+    assert!(union2.b().is_none());
+    union2 = UnionAlign::right(b);
+    assert!(union2.a().is_none());
+    assert!(union2.b().is_some());
+
+    let b: ArcBox<_> = SliceWithHeader::new("b", 10..20);
+
+    let mut union4 = UnionAlign::a(a);
+    assert!(union4.a().is_some());
+    union4 = UnionAlign::b(b);
+    assert!(union4.b().is_some());
+    union4 = UnionAlign::c(c);
+    assert!(union4.c().is_some());
+    union4 = UnionAlign::d(d);
+    assert!(union4.d().is_some());
 }
