@@ -184,11 +184,11 @@ impl<T: ?Sized> Arc<T> {
     }
     /// Try to convert this `Arc` to an `ArcBox` if it is unique
     #[inline]
-    pub fn try_unique(self) -> Result<ArcBox<T>, Arc<T>> {
-        if self.is_unique() {
-            Ok(ArcBox(self))
+    pub fn try_unique(this: Self) -> Result<ArcBox<T>, Arc<T>> {
+        if this.is_unique() {
+            Ok(ArcBox(this))
         } else {
-            Err(self)
+            Err(this)
         }
     }
     /// Get the reference count of this `Arc` with a given ordering
@@ -318,11 +318,11 @@ impl<T: Clone> Arc<T> {
     }
     /// Convert this `Arc` to an `ArcBox`, cloning the internal data if necessary for uniqueness
     #[inline]
-    pub fn unique(self) -> ArcBox<T> {
-        if self.is_unique() {
-            ArcBox(self)
+    pub fn unique(this: Self) -> ArcBox<T> {
+        if this.is_unique() {
+            ArcBox(this)
         } else {
-            ArcBox::new(self.deref().clone())
+            ArcBox::new(this.deref().clone())
         }
     }
 }
