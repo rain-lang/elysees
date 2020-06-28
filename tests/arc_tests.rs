@@ -1,6 +1,7 @@
 use elysees::*;
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::Relaxed;
 
@@ -189,4 +190,13 @@ fn arc_default() {
     assert!(arc.is_unique());
     let unique_arc: ArcBox<usize> = ArcBox::default();
     assert_eq!(*unique_arc, 0);
+}
+
+#[test]
+fn arc_hash() {
+    let mut map = HashSet::new();
+    assert!(map.insert(Arc::new(7)));
+    assert!(map.insert(Arc::new(8)));
+    assert!(map.insert(Arc::new(9)));
+    assert!(!map.insert(Arc::new(7)));
 }
