@@ -1,7 +1,9 @@
 use core::borrow::{Borrow, BorrowMut};
 use core::convert::AsRef;
 use core::hash::Hash;
+use core::mem;
 use core::ops::{Deref, DerefMut};
+use core::ptr;
 #[cfg(feature = "erasable")]
 use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
@@ -109,6 +111,48 @@ impl<T: ?Sized> AsMut<T> for ArcBox<T> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         &mut **self
+    }
+}
+
+impl<T: ?Sized> Borrow<*const T> for ArcBox<T> {
+    #[inline]
+    fn borrow(&self) -> &*const T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> AsRef<*const T> for ArcBox<T> {
+    #[inline]
+    fn as_ref(&self) -> &*const T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> Borrow<*mut T> for ArcBox<T> {
+    #[inline]
+    fn borrow(&self) -> &*mut T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> AsRef<*mut T> for ArcBox<T> {
+    #[inline]
+    fn as_ref(&self) -> &*mut T {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> Borrow<ptr::NonNull<T>> for ArcBox<T> {
+    #[inline]
+    fn borrow(&self) -> &ptr::NonNull<T> {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<T: ?Sized> AsRef<ptr::NonNull<T>> for ArcBox<T> {
+    #[inline]
+    fn as_ref(&self) -> &ptr::NonNull<T> {
+        unsafe { mem::transmute(self) }
     }
 }
 
