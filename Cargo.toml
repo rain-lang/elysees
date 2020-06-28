@@ -1,6 +1,6 @@
 [package]
 name = "elysees"
-version = "0.0.6"
+version = "0.1.0"
 authors = ["Jad Elkhaleq Ghalayini", "The Servo Project Developers"]
 license = "MIT/Apache-2.0"
 repository = "https://gitlab.com/rain-lang/elysees"
