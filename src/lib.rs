@@ -26,10 +26,13 @@ extern crate stable_deref_trait;
 
 mod arc;
 mod borrow;
+#[cfg(feature = "ptr-union")]
+mod union;
 mod unique;
 
 pub use arc::*;
 pub use borrow::*;
+pub use union::*;
 pub use unique::*;
 
 #[cfg(feature = "std")]
