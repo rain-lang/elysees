@@ -103,7 +103,7 @@ impl<T> Arc<T> {
     #[inline]
     pub fn new(data: T) -> Self {
         let inner = ArcInner {
-            count: atomic::AtomicUsize::new(0),
+            count: atomic::AtomicUsize::new(1),
             data,
         };
         let layout = Layout::for_value(&inner);
@@ -501,7 +501,7 @@ unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
         // Write counter
         ptr::write(
             inner_alloc as *mut atomic::AtomicUsize,
-            atomic::AtomicUsize::new(0),
+            atomic::AtomicUsize::new(1),
         );
 
         // Get slice pointer
@@ -550,7 +550,7 @@ mod tests {
             hash: u64,
         };
         let inner = ArcInner {
-            count: atomic::AtomicUsize::new(0),
+            count: atomic::AtomicUsize::new(1),
             data: MyStruct {
                 id: 596843,
                 name: "Jane".into(),
