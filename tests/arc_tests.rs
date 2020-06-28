@@ -32,7 +32,33 @@ fn basic_arc_creation_works() {
     let yb2 = yb.clone();
     assert_eq!(ArcBorrow::count(yb, Ordering::Relaxed), 1);
     assert_eq!(ArcBorrow::count(yb2, Ordering::Relaxed), 1);
-    let ybr = ArcBorrow::as_arc(&yb2);
+    let ybr = yb2.as_arc();
     assert_eq!(Arc::count(ybr, Ordering::Relaxed), 1);
     assert!(ybr.is_unique());
+
+    let z = y.clone();
+    assert_eq!(*z.deref(), 80);
+    let yl = Arc::leak(y);
+    assert_eq!(ArcBorrow::count(yl, Ordering::Relaxed), 2);
+    assert_eq!(Arc::count(yl.as_arc(), Ordering::Relaxed), 2);
+    assert_eq!(Arc::count(&z, Ordering::Relaxed), 2);
+    let t = yl.as_arc().clone();
+    assert_eq!(Arc::count(&t, Ordering::Relaxed), 3);
+    let w = yl.clone_arc();
+    assert_eq!(Arc::count(&t, Ordering::Relaxed), 4);
+    assert_eq!(Arc::count(&z, Ordering::Relaxed), 4);
+    assert_eq!(Arc::count(&w, Ordering::Relaxed), 4);
+    assert_eq!(ArcBorrow::count(yl, Ordering::Relaxed), 4);
+
+    std::mem::drop(w);
+    assert_eq!(Arc::count(&t, Ordering::Relaxed), 3);
+    assert_eq!(Arc::count(&z, Ordering::Relaxed), 3);
+    assert_eq!(ArcBorrow::count(yl, Ordering::Relaxed), 3);
+
+    std::mem::drop(t);
+    assert_eq!(Arc::count(&z, Ordering::Relaxed), 2);
+    assert_eq!(ArcBorrow::count(yl, Ordering::Relaxed), 2);
+
+    std::mem::drop(z);
+    assert_eq!(ArcBorrow::count(yl, Ordering::Relaxed), 1);
 }
