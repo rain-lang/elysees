@@ -126,7 +126,7 @@ impl<T: ?Sized> Arc<T> {
     /// Borrow this `Arc<T>` as an `ArcBorrow<T>`
     #[inline]
     pub fn borrow_arc(&self) -> ArcBorrow<T> {
-        unsafe { ArcBorrow::from_raw(self.ptr.as_ptr()) }
+        unsafe { ArcBorrow::from_ref(self.deref()) }
     }
     /// Leak this `Arc<T>`, getting an `ArcBorrow<'static, T>`
     ///

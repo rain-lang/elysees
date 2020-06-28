@@ -63,6 +63,16 @@ impl<'a, T: ?Sized> ArcBorrow<'a, T> {
     /// # Safety
     /// This pointer shouild come from `Arc::into_raw`: this, however, will *not* consume it!
     #[inline]
+    pub unsafe fn from_ref(ptr: &'a T) -> Self {
+        ArcBorrow::from_raw(ptr)
+    }
+
+    /// For constructing from a pointer known to be Arc-backed,
+    /// e.g. if we obtain such a pointer over FFI
+    ///
+    /// # Safety
+    /// This pointer shouild come from `Arc::into_raw`: this, however, will *not* consume it!
+    #[inline]
     pub unsafe fn from_raw(ptr: *const T) -> Self {
         ArcBorrow {
             ptr: ptr::NonNull::new_unchecked(ptr as *mut T),
