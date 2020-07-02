@@ -426,13 +426,6 @@ impl<T: ?Sized> AsRef<T> for Arc<T> {
     }
 }
 
-impl<T: ?Sized> Borrow<*const T> for Arc<T> {
-    #[inline]
-    fn borrow(&self) -> &*const T {
-        unsafe { &*(self as *const Arc<T> as *const *const T) }
-    }
-}
-
 impl<T: ?Sized> AsRef<*const T> for Arc<T> {
     #[inline]
     fn as_ref(&self) -> &*const T {
@@ -440,24 +433,10 @@ impl<T: ?Sized> AsRef<*const T> for Arc<T> {
     }
 }
 
-impl<T: ?Sized> Borrow<*mut T> for Arc<T> {
-    #[inline]
-    fn borrow(&self) -> &*mut T {
-        unsafe { &*(self as *const Arc<T> as *const *mut T) }
-    }
-}
-
 impl<T: ?Sized> AsRef<*mut T> for Arc<T> {
     #[inline]
     fn as_ref(&self) -> &*mut T {
         unsafe { &*(self as *const Arc<T> as *const *mut T) }
-    }
-}
-
-impl<T: ?Sized> Borrow<ptr::NonNull<T>> for Arc<T> {
-    #[inline]
-    fn borrow(&self) -> &ptr::NonNull<T> {
-        unsafe { &*(self as *const Arc<T> as *const ptr::NonNull<T>) }
     }
 }
 

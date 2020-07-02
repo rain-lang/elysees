@@ -1,3 +1,7 @@
+# 0.2.0
+
+- Remove erroneous `Borrow` implementation for `Arc`, `ArcBorrow`, and `ArcBox`
+
 # 0.1.2
 
 - Fix undefined behaviour in MIRI

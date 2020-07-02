@@ -118,9 +118,9 @@ fn basic_arc_usage() {
     let not_unique = Arc::try_unique(not_unique).expect_err("Not unique!");
     assert!(!box_unique.is_unique());
 
-    let ptr_borrow: &*const usize = not_unique.borrow();
-    let leak_ptr_borrow: &*const usize = yl.borrow();
-    let unique_ptr_borrow: &*const usize = remake_unique.borrow();
+    let ptr_borrow: &*const usize = not_unique.as_ref();
+    let leak_ptr_borrow: &*const usize = yl.as_ref();
+    let unique_ptr_borrow: &*const usize = remake_unique.as_ref();
     assert_eq!(*ptr_borrow, &*not_unique as *const _);
     assert_eq!(*leak_ptr_borrow, &*yl as *const _);
     assert_eq!(*unique_ptr_borrow, &*remake_unique as *const _);
@@ -133,36 +133,12 @@ fn basic_arc_usage() {
     assert_eq!(*leak_ptr_borrow, yl.get() as *const _);
     assert_eq!(*unique_ptr_borrow, remake_unique.as_ref() as *const _);
 
-    let ptr_borrow: &*const usize = not_unique.as_ref();
-    let leak_ptr_borrow: &*const usize = yl.as_ref();
-    let unique_ptr_borrow: &*const usize = remake_unique.as_ref();
-    assert_eq!(*ptr_borrow, &*not_unique as *const _);
-    assert_eq!(*leak_ptr_borrow, &*yl as *const _);
-    assert_eq!(*unique_ptr_borrow, &*remake_unique as *const _);
-
-    let ptr_borrow: &*mut usize = not_unique.borrow();
-    let leak_ptr_borrow: &*mut usize = yl.borrow();
-    let unique_ptr_borrow: &*mut usize = remake_unique.borrow();
-    assert_eq!(*ptr_borrow as *const _, &*not_unique as *const _);
-    assert_eq!(*leak_ptr_borrow as *const _, &*yl as *const _);
-    assert_eq!(*unique_ptr_borrow as *const _, &*remake_unique as *const _);
-
     let ptr_borrow: &*mut usize = not_unique.as_ref();
     let leak_ptr_borrow: &*mut usize = yl.as_ref();
     let unique_ptr_borrow: &*mut usize = remake_unique.as_ref();
     assert_eq!(*ptr_borrow as *const _, &*not_unique as *const _);
     assert_eq!(*leak_ptr_borrow as *const _, &*yl as *const _);
     assert_eq!(*unique_ptr_borrow as *const _, &*remake_unique as *const _);
-
-    let ptr_borrow: &NonNull<_> = not_unique.borrow();
-    let leak_ptr_borrow: &NonNull<_> = yl.borrow();
-    let unique_ptr_borrow: &NonNull<_> = remake_unique.borrow();
-    assert_eq!(ptr_borrow.as_ptr() as *const _, &*not_unique as *const _);
-    assert_eq!(leak_ptr_borrow.as_ptr() as *const _, &*yl as *const _);
-    assert_eq!(
-        unique_ptr_borrow.as_ptr() as *const _,
-        &*remake_unique as *const _
-    );
 
     let ptr_borrow: &NonNull<_> = not_unique.as_ref();
     let leak_ptr_borrow: &NonNull<_> = yl.as_ref();
