@@ -550,6 +550,26 @@ unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for Arc<S> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+mod arbitrary_impl {
+    use super::*;
+    use arbitrary::{Arbitrary, Result, Unstructured};
+    impl<T: Arbitrary> Arbitrary for Arc<T> {
+        fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self> {
+            T::arbitrary(u).map(Arc::new)
+        }
+        fn arbitrary_take_rest(u: Unstructured<'_>) -> Result<Self> {
+            T::arbitrary_take_rest(u).map(Arc::new)
+        }
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            T::size_hint(depth)
+        }
+        fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+            Box::new(self.deref().shrink().map(|v| Arc::new(v)))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -202,3 +202,23 @@ unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for ArcBox<S> {
         ArcBox(Arc::new_slice_dst(len, init))
     }
 }
+
+#[cfg(feature = "arbitrary")]
+mod arbitrary_impl {
+    use super::*;
+    use arbitrary::{Arbitrary, Result, Unstructured};
+    impl<T: Arbitrary> Arbitrary for ArcBox<T> {
+        fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self> {
+            T::arbitrary(u).map(ArcBox::new)
+        }
+        fn arbitrary_take_rest(u: Unstructured<'_>) -> Result<Self> {
+            T::arbitrary_take_rest(u).map(ArcBox::new)
+        }
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            T::size_hint(depth)
+        }
+        fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+            Box::new(self.deref().shrink().map(|v| ArcBox::new(v)))
+        }
+    }
+}

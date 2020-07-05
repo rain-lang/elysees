@@ -1,3 +1,7 @@
+# 0.2.1
+
+- Added `Arbitrary` implementation for `Arc` and `ArcBox`
+
 # 0.2.0
 
 - Remove erroneous `Borrow` implementation for `Arc`, `ArcBorrow`, and `ArcBox`
