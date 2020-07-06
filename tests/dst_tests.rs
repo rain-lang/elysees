@@ -34,6 +34,7 @@ fn basic_dst_test() {
     );
 }
 
+#[cfg(feature = "slice-dst")]
 #[test]
 fn unique_dst_test() {
     let mut arc: ArcBox<_> = SliceWithHeader::new("unique", 0..5);
