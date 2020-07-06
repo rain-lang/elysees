@@ -1,5 +1,7 @@
 use elysees::*;
+#[cfg(feature = "erasable")]
 use erasable::Thin;
+#[cfg(feature = "slice-dst")]
 use slice_dst::{SliceWithHeader, TryAllocSliceDst};
 use std::borrow::BorrowMut;
 use std::iter::FromIterator;
