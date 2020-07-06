@@ -37,8 +37,9 @@ mod unique;
 
 pub use arc::*;
 pub use borrow::*;
-pub use union::*;
 pub use unique::*;
+#[cfg(feature = "ptr-union")]
+pub use union::*;
 
 #[cfg(feature = "std")]
 use std::process::abort;
