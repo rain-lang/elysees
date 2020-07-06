@@ -7,8 +7,6 @@ use core::ptr;
 use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "slice-dst")]
-use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::StableDeref;
 
@@ -152,6 +150,7 @@ impl<T: Default> Default for ArcBox<T> {
 
 #[cfg(feature = "slice-dst")]
 mod slice_dst_impl {
+    use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 
     #[cfg(feature = "stable_deref_trait")]
     unsafe impl<T: ?Sized> StableDeref for ArcBox<T> {}
