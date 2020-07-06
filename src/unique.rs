@@ -148,43 +148,43 @@ impl<T: Default> Default for ArcBox<T> {
     }
 }
 
+#[cfg(feature = "stable_deref_trait")]
+unsafe impl<T: ?Sized> StableDeref for ArcBox<T> {}
+
+#[cfg(feature = "serde")]
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for ArcBox<T> {
+    fn deserialize<D>(deserializer: D) -> Result<ArcBox<T>, D::Error>
+    where
+        D: ::serde::de::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(ArcBox::new)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: ?Sized + Serialize> Serialize for ArcBox<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::ser::Serializer,
+    {
+        (**self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "erasable")]
+unsafe impl<T: ?Sized + Erasable> ErasablePtr for ArcBox<T> {
+    fn erase(this: Self) -> ErasedPtr {
+        ErasablePtr::erase(this.0)
+    }
+
+    unsafe fn unerase(this: ErasedPtr) -> Self {
+        ArcBox(ErasablePtr::unerase(this))
+    }
+}
+
 #[cfg(feature = "slice-dst")]
 mod slice_dst_impl {
     use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
-
-    #[cfg(feature = "stable_deref_trait")]
-    unsafe impl<T: ?Sized> StableDeref for ArcBox<T> {}
-
-    #[cfg(feature = "serde")]
-    impl<'de, T: Deserialize<'de>> Deserialize<'de> for ArcBox<T> {
-        fn deserialize<D>(deserializer: D) -> Result<ArcBox<T>, D::Error>
-        where
-            D: ::serde::de::Deserializer<'de>,
-        {
-            T::deserialize(deserializer).map(ArcBox::new)
-        }
-    }
-
-    #[cfg(feature = "serde")]
-    impl<T: ?Sized + Serialize> Serialize for ArcBox<T> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: ::serde::ser::Serializer,
-        {
-            (**self).serialize(serializer)
-        }
-    }
-
-    #[cfg(feature = "erasable")]
-    unsafe impl<T: ?Sized + Erasable> ErasablePtr for ArcBox<T> {
-        fn erase(this: Self) -> ErasedPtr {
-            ErasablePtr::erase(this.0)
-        }
-
-        unsafe fn unerase(this: ErasedPtr) -> Self {
-            ArcBox(ErasablePtr::unerase(this))
-        }
-    }
 
     #[cfg(feature = "slice-dst")]
     unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for ArcBox<S> {
