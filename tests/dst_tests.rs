@@ -63,6 +63,7 @@ fn unique_dst_test() {
     Arc::try_unique(arc).expect_err("Not unique!");
 }
 
+#[cfg(all(feature = "slice-dst", feature = "ptr-union"))]
 #[test]
 fn dst_union_test() {
     let a: Arc<_> = SliceWithHeader::new("a", 0..10);
