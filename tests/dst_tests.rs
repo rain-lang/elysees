@@ -7,6 +7,7 @@ use std::borrow::BorrowMut;
 use std::iter::FromIterator;
 use std::ptr::NonNull;
 
+#[cfg(feature = "slice-dst")]
 #[test]
 fn basic_dst_test() {
     let vec = Vec::from_iter(0..100);
