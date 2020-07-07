@@ -575,10 +575,10 @@ mod arbitrary_impl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[cfg(feature = "std")]
     #[test]
     fn data_offset_sanity_tests() {
+        use super::*;
         #[allow(dead_code)]
         struct MyStruct {
             id: usize,

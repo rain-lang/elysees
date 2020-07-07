@@ -1,10 +1,14 @@
+#[cfg(feature = "slice-dst")]
 use elysees::*;
-#[cfg(feature = "erasable")]
+#[cfg(feature = "slice-dst")]
 use erasable::Thin;
 #[cfg(feature = "slice-dst")]
 use slice_dst::{SliceWithHeader, TryAllocSliceDst};
+#[cfg(feature = "slice-dst")]
 use std::borrow::BorrowMut;
+#[cfg(feature = "slice-dst")]
 use std::iter::FromIterator;
+#[cfg(feature = "slice-dst")]
 use std::ptr::NonNull;
 
 #[cfg(feature = "slice-dst")]

@@ -184,6 +184,7 @@ unsafe impl<T: ?Sized + Erasable> ErasablePtr for ArcBox<T> {
 
 #[cfg(feature = "slice-dst")]
 mod slice_dst_impl {
+    use super::*;
     use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 
     #[cfg(feature = "slice-dst")]
