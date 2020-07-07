@@ -37,6 +37,7 @@ mod unique;
 
 pub use arc::*;
 pub use borrow::*;
+#[cfg(feature = "ptr-union")]
 pub use union::*;
 pub use unique::*;
 

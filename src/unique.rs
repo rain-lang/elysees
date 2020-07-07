@@ -7,8 +7,6 @@ use core::ptr;
 use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "slice-dst")]
-use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::StableDeref;
 
@@ -185,21 +183,27 @@ unsafe impl<T: ?Sized + Erasable> ErasablePtr for ArcBox<T> {
 }
 
 #[cfg(feature = "slice-dst")]
-unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for ArcBox<S> {
-    unsafe fn try_new_slice_dst<I, E>(len: usize, init: I) -> Result<Self, E>
-    where
-        I: FnOnce(ptr::NonNull<S>) -> Result<(), E>,
-    {
-        Arc::try_new_slice_dst(len, init).map(ArcBox)
-    }
-}
+mod slice_dst_impl {
+    use super::*;
+    use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 
-unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for ArcBox<S> {
-    unsafe fn new_slice_dst<I>(len: usize, init: I) -> Self
-    where
-        I: FnOnce(ptr::NonNull<S>),
-    {
-        ArcBox(Arc::new_slice_dst(len, init))
+    #[cfg(feature = "slice-dst")]
+    unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for ArcBox<S> {
+        unsafe fn try_new_slice_dst<I, E>(len: usize, init: I) -> Result<Self, E>
+        where
+            I: FnOnce(ptr::NonNull<S>) -> Result<(), E>,
+        {
+            Arc::try_new_slice_dst(len, init).map(ArcBox)
+        }
+    }
+
+    unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for ArcBox<S> {
+        unsafe fn new_slice_dst<I>(len: usize, init: I) -> Self
+        where
+            I: FnOnce(ptr::NonNull<S>),
+        {
+            ArcBox(Arc::new_slice_dst(len, init))
+        }
     }
 }
 
@@ -217,7 +221,7 @@ mod arbitrary_impl {
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
             T::size_hint(depth)
         }
-        fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
             Box::new(self.deref().shrink().map(|v| ArcBox::new(v)))
         }
     }
