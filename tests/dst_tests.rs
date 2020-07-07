@@ -1,10 +1,17 @@
+#[cfg(feature = "slice-dst")]
 use elysees::*;
+#[cfg(feature = "slice-dst")]
 use erasable::Thin;
+#[cfg(feature = "slice-dst")]
 use slice_dst::{SliceWithHeader, TryAllocSliceDst};
+#[cfg(feature = "slice-dst")]
 use std::borrow::BorrowMut;
+#[cfg(feature = "slice-dst")]
 use std::iter::FromIterator;
+#[cfg(feature = "slice-dst")]
 use std::ptr::NonNull;
 
+#[cfg(feature = "slice-dst")]
 #[test]
 fn basic_dst_test() {
     let vec = Vec::from_iter(0..100);
@@ -32,6 +39,7 @@ fn basic_dst_test() {
     );
 }
 
+#[cfg(feature = "slice-dst")]
 #[test]
 fn unique_dst_test() {
     let mut arc: ArcBox<_> = SliceWithHeader::new("unique", 0..5);
@@ -63,6 +71,7 @@ fn unique_dst_test() {
     Arc::try_unique(arc).expect_err("Not unique!");
 }
 
+#[cfg(all(feature = "slice-dst", feature = "ptr-union"))]
 #[test]
 fn dst_union_test() {
     let a: Arc<_> = SliceWithHeader::new("a", 0..10);
@@ -90,6 +99,7 @@ fn dst_union_test() {
     assert!(union4.d().is_some());
 }
 
+#[cfg(feature = "slice-dst")]
 #[test]
 fn failed_dst_alloc() {
     fn fallible_alloc(_: NonNull<SliceWithHeader<&str, u8>>) -> Result<(), &str> {

@@ -16,8 +16,6 @@ use core::{isize, usize};
 use erasable::{Erasable, ErasablePtr, ErasedPtr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "slice-dst")]
-use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
@@ -485,67 +483,72 @@ unsafe impl<T: ?Sized + Erasable> ErasablePtr for Arc<T> {
 }
 
 #[cfg(feature = "slice-dst")]
-unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
-    unsafe fn try_new_slice_dst<I, E>(len: usize, init: I) -> Result<Self, E>
-    where
-        I: FnOnce(ptr::NonNull<S>) -> Result<(), E>,
-    {
-        pub struct RawAlloc(*mut u8, Layout);
+mod slice_dst_impl {
+    use super::*;
+    use slice_dst::{AllocSliceDst, SliceDst, TryAllocSliceDst};
 
-        impl Drop for RawAlloc {
-            fn drop(&mut self) {
-                unsafe { dealloc(self.0, self.1) }
-            }
-        }
-
-        // Compute layouts
-        let slice_layout = S::layout_for(len);
-        let count_layout = Layout::new::<atomic::AtomicUsize>();
-        let (inner_layout, slice_offset) = count_layout
-            .extend(slice_layout)
-            .expect("Integer overflow computing slice layout");
-        // Allocate
-        let inner_alloc = alloc(inner_layout);
-        let drop_guard = RawAlloc(inner_alloc, inner_layout);
+    unsafe impl<S: ?Sized + SliceDst> TryAllocSliceDst<S> for Arc<S> {
+        unsafe fn try_new_slice_dst<I, E>(len: usize, init: I) -> Result<Self, E>
+        where
+            I: FnOnce(ptr::NonNull<S>) -> Result<(), E>,
         {
-            #[allow(clippy::cast_ptr_alignment)]
-            // Write counter
-            ptr::write(
-                inner_alloc as *mut atomic::AtomicUsize,
-                atomic::AtomicUsize::new(1),
-            );
+            pub struct RawAlloc(*mut u8, Layout);
+
+            impl Drop for RawAlloc {
+                fn drop(&mut self) {
+                    unsafe { dealloc(self.0, self.1) }
+                }
+            }
+
+            // Compute layouts
+            let slice_layout = S::layout_for(len);
+            let count_layout = Layout::new::<atomic::AtomicUsize>();
+            let (inner_layout, slice_offset) = count_layout
+                .extend(slice_layout)
+                .expect("Integer overflow computing slice layout");
+            // Allocate
+            let inner_alloc = alloc(inner_layout);
+            let drop_guard = RawAlloc(inner_alloc, inner_layout);
+            {
+                #[allow(clippy::cast_ptr_alignment)]
+                // Write counter
+                ptr::write(
+                    inner_alloc as *mut atomic::AtomicUsize,
+                    atomic::AtomicUsize::new(1),
+                );
+            }
+
+            // Get slice pointer
+            let slice_addr = inner_alloc.add(slice_offset) as *mut ();
+            let slice_ptr = core::slice::from_raw_parts_mut(slice_addr, len);
+
+            // Get DST pointer
+            let ptr = S::retype(ptr::NonNull::new_unchecked(slice_ptr));
+
+            // Attempt to initialize the DST pointer
+            init(ptr)?;
+
+            // Successful construction: forget the drop guard and make an `Arc`
+            mem::forget(drop_guard);
+            Ok(Arc {
+                ptr,
+                phantom: PhantomData,
+            })
         }
-
-        // Get slice pointer
-        let slice_addr = inner_alloc.add(slice_offset) as *mut ();
-        let slice_ptr = core::slice::from_raw_parts_mut(slice_addr, len);
-
-        // Get DST pointer
-        let ptr = S::retype(ptr::NonNull::new_unchecked(slice_ptr));
-
-        // Attempt to initialize the DST pointer
-        init(ptr)?;
-
-        // Successful construction: forget the drop guard and make an `Arc`
-        mem::forget(drop_guard);
-        Ok(Arc {
-            ptr,
-            phantom: PhantomData,
-        })
     }
-}
 
-unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for Arc<S> {
-    unsafe fn new_slice_dst<I>(len: usize, init: I) -> Self
-    where
-        I: FnOnce(ptr::NonNull<S>),
-    {
-        enum Void {} // or never (!) once it is stable
-        #[allow(clippy::unit_arg)]
-        let init = |ptr| Ok::<(), Void>(init(ptr));
-        match Self::try_new_slice_dst(len, init) {
-            Ok(a) => a,
-            Err(void) => match void {},
+    unsafe impl<S: ?Sized + SliceDst> AllocSliceDst<S> for Arc<S> {
+        unsafe fn new_slice_dst<I>(len: usize, init: I) -> Self
+        where
+            I: FnOnce(ptr::NonNull<S>),
+        {
+            enum Void {} // or never (!) once it is stable
+            #[allow(clippy::unit_arg)]
+            let init = |ptr| Ok::<(), Void>(init(ptr));
+            match Self::try_new_slice_dst(len, init) {
+                Ok(a) => a,
+                Err(void) => match void {},
+            }
         }
     }
 }
@@ -564,7 +567,7 @@ mod arbitrary_impl {
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
             T::size_hint(depth)
         }
-        fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
             Box::new(self.deref().shrink().map(|v| Arc::new(v)))
         }
     }
@@ -572,9 +575,10 @@ mod arbitrary_impl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    #[cfg(feature = "std")]
     #[test]
     fn data_offset_sanity_tests() {
+        use super::*;
         #[allow(dead_code)]
         struct MyStruct {
             id: usize,
