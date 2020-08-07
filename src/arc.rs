@@ -568,7 +568,7 @@ mod arbitrary_impl {
             T::size_hint(depth)
         }
         fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-            Box::new(self.deref().shrink().map(|v| Arc::new(v)))
+            Box::new(self.deref().shrink().map(Arc::new))
         }
     }
 }
