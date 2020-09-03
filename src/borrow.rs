@@ -71,7 +71,7 @@ impl<'a, T: ?Sized> ArcBorrow<'a, T> {
     /// e.g. if we obtain such a pointer over FFI
     ///
     /// # Safety
-    /// This pointer shouild come from `Arc::into_raw`: this, however, will *not* consume it!
+    /// This pointer should come from `Arc::into_raw`: this, however, will *not* consume it!
     #[inline]
     pub unsafe fn from_raw(ptr: *const T) -> Self {
         ArcBorrow {
