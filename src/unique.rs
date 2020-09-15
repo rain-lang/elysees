@@ -219,3 +219,16 @@ mod arbitrary_impl {
 
 #[cfg(feature = "stowaway")]
 unsafe impl<T> Stowable for ArcBox<T> {}
+
+#[cfg(feature = "stowaway")]
+#[test]
+fn basic_stowaway_test() {
+    use stowaway::Stowaway;
+    let arc = ArcBox::new(35);
+    let cloned = arc.clone();
+    let stowed_arc = Stowaway::new(arc);
+    let storage = Stowaway::into_raw(stowed_arc);
+    let new_stowed: Stowaway<ArcBox<u32>> = unsafe { Stowaway::from_raw(storage) };
+    let unstowed: ArcBox<u32> = Stowaway::into_inner(new_stowed);
+    assert_eq!(unstowed, cloned);
+}
