@@ -1,18 +1,4 @@
-use core::borrow::Borrow;
-use core::convert::AsRef;
-use core::hash::Hash;
-use core::marker::PhantomData;
-use core::ops::Deref;
-use core::ptr;
-use core::sync::atomic::Ordering;
-#[cfg(feature = "erasable")]
-use erasable::{Erasable, ErasablePtr, ErasedPtr};
-#[cfg(feature = "serde")]
-use serde::Serialize;
-#[cfg(feature = "stable_deref_trait")]
-use stable_deref_trait::{CloneStableDeref, StableDeref};
-
-use super::Arc;
+use crate::*;
 
 /// A "borrowed `Arc`". This is a pointer to
 /// a T that is known to have been allocated within an
@@ -101,7 +87,7 @@ impl<'a, T: ?Sized> ArcBorrow<'a, T> {
     }
 
     /// Get the reference count of this `Arc` with a given memory ordering
-    pub fn count(this: ArcBorrow<'a, T>, ordering: Ordering) -> usize {
+    pub fn count(this: ArcBorrow<'a, T>, ordering: LoadOrdering) -> usize {
         Arc::count(this.as_arc(), ordering)
     }
 }

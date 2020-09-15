@@ -29,6 +29,29 @@ extern crate serde;
 #[cfg(feature = "stable_deref_trait")]
 extern crate stable_deref_trait;
 
+use alloc::alloc::{alloc, dealloc, Layout};
+use core::borrow::{Borrow, BorrowMut};
+use core::cmp::Ordering;
+use core::convert::From;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::mem;
+use core::ops::{Deref, DerefMut};
+use core::ptr;
+use core::sync::atomic;
+use core::sync::atomic::Ordering::{self as LoadOrdering, Acquire, Relaxed, Release};
+use core::{isize, usize};
+
+#[cfg(feature = "erasable")]
+use erasable::{Erasable, ErasablePtr, ErasedPtr};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "stable_deref_trait")]
+use stable_deref_trait::{CloneStableDeref, StableDeref};
+#[cfg(feature = "stowaway")]
+use stowaway::Stowable;
+
 mod arc;
 mod borrow;
 #[cfg(feature = "ptr-union")]
