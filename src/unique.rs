@@ -216,3 +216,6 @@ mod arbitrary_impl {
         }
     }
 }
+
+#[cfg(feature = "stowaway")]
+unsafe impl<T> Stowable for ArcBox<T> {}

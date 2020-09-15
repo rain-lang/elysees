@@ -185,3 +185,6 @@ unsafe impl<'a, T: ?Sized + Erasable> ErasablePtr for ArcBorrow<'a, T> {
         }
     }
 }
+
+#[cfg(feature = "stowaway")]
+unsafe impl<T> Stowable for ArcBorrow<'_, T> {}

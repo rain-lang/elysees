@@ -1,3 +1,8 @@
+# 0.2.3
+
+- Minor refactor
+- Added optional support for `stowaway`, with the `Stowable` trait implemented for `Arc`, `ArcBox`, `ArcUnion`, and `ArcBorrow`.
+
 # 0.2.2
 
 - Fixed failing `--no-default-features` build

@@ -534,8 +534,6 @@ mod slice_dst_impl {
     }
 }
 
-unsafe impl<T> Stowable for Arc<T> {}
-
 #[cfg(feature = "arbitrary")]
 mod arbitrary_impl {
     use super::*;
@@ -555,6 +553,9 @@ mod arbitrary_impl {
         }
     }
 }
+
+#[cfg(feature = "stowaway")]
+unsafe impl<T> Stowable for Arc<T> {}
 
 #[cfg(test)]
 mod tests {
