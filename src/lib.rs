@@ -49,8 +49,6 @@ use erasable::{Erasable, ErasablePtr, ErasedPtr};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "stable_deref_trait")]
 use stable_deref_trait::{CloneStableDeref, StableDeref};
-#[cfg(feature = "stowaway")]
-use stowaway::Stowable;
 
 mod arc;
 mod borrow;

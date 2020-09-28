@@ -554,9 +554,6 @@ mod arbitrary_impl {
     }
 }
 
-#[cfg(feature = "stowaway")]
-unsafe impl<T> Stowable for Arc<T> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -584,26 +581,5 @@ mod tests {
         let (layout, data_offset) = ArcInner::data_offset(data);
         assert_eq!(data_addr - inner_addr, data_offset);
         assert_eq!(layout, Layout::for_value(&inner));
-    }
-
-    #[cfg(feature = "stowaway")]
-    #[test]
-    fn basic_stowaway_test() {
-        use stowaway::Stowaway;
-        let arc = Arc::new(35);
-        let borrowed = arc.borrow_arc();
-        let stowed_borrow = Stowaway::new(borrowed);
-        let borrow_storage = Stowaway::into_raw(stowed_borrow);
-        let new_stowed_borrow: Stowaway<ArcBorrow<u32>> =
-            unsafe { Stowaway::from_raw(borrow_storage) };
-        let unstowed_borrow: ArcBorrow<u32> = Stowaway::into_inner(new_stowed_borrow);
-        assert_eq!(unstowed_borrow, borrowed);
-        let cloned = arc.clone();
-        let stowed_arc = Stowaway::new(arc);
-        let storage = Stowaway::into_raw(stowed_arc);
-        assert_eq!(storage, borrow_storage);
-        let new_stowed: Stowaway<Arc<u32>> = unsafe { Stowaway::from_raw(storage) };
-        let unstowed: Arc<u32> = Stowaway::into_inner(new_stowed);
-        assert_eq!(unstowed, cloned);
     }
 }

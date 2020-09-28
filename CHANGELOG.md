@@ -1,3 +1,7 @@
+# 0.2.4
+
+- Removed support for `stowaway` due to yanked package...
+
 # 0.2.3
 
 - Minor refactor
